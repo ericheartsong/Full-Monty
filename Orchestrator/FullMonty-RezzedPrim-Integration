@@ -1,0 +1,120 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//  Lady Green Forensic Component     : FULLMONTY - REZZEDPRIM
+//
+//  Signature                         : LGF/APPS/FULLMONTY/REZZED_PRIM
+//  Component version                 : 1.0.0
+//  release date                      : January 2024
+//
+//  Description : This component rezzes prims from an orchestrator 
+//
+//
+//
+//  States description :
+//      default:
+//          Default state
+//
+//
+//  copyright © Lady Green Forensic 2024
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3 
+//  (https://www.gnu.org/licenses/gpl-3.0.html)lcode)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+
+integer K_CHANNEL_INTEGRATION = 4;
+integer K_MSG_INTEGRATOR_RESET = 3; 
+
+// Generic commands integration for a smog machine
+integer K_MSG_INTEGRATOR_REGISTER = 1;
+string K_ID_MESSAGELINK_INTEGRATOR = "INTEGRATOR";
+string K_MSG_INTEGRATION_SMOG_ON = "INTEGRATION_SMOG_ON";
+string K_MSG_INTEGRATION_SMOG_OFF = "INTEGRATION_SMOG_OFF";
+string K_MSG_INTEGRATION_DEBUGON = "INTEGRATION_DEBUGON";
+string K_MSG_INTEGRATION_DEBUGOFF = "INTEGRATION_DEBUGOFF";
+string K_MSG_REZZ_PRIM            = "REZZPRIM";
+string K_MSG_RESET_REZZ_PRIM      = "RESET_REZZPRIM";
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+list rezzedPrim= [];
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+initialize() {
+    
+    llOwnerSay("Rezzed components integration installed...");
+    rezzedPrim = [];
+}
+
+rezzPrim(list msgCmd) {
+    
+    string template  = llList2String(msgCmd, 1);
+    string label     = llList2String(msgCmd, 2);
+    string channel   = llList2String(msgCmd, 3);
+    string posString = llList2String(msgCmd, 4);
+    string rotString = llList2String(msgCmd, 5);
+              
+    vector vectPos= (vector)posString;
+    vector vectRot= (vector)rotString;
+    debug ("vectorPos =" + (string) vectPos);
+    debug ("vectorRot =" + (string) vectRot);
+    rotation rot = llEuler2Rot(vectRot * DEG_TO_RAD);
+    debug ("rotation =" + (string) rot);
+    llRezObject(template, 
+                 llGetPos() + vectPos, 
+                 <0.0,0.0,0.0>, 
+                 rot, 
+                 0);
+                 
+    rezzedPrim += label;
+    rezzedPrim += channel;
+    
+    llMessageLinked(LINK_ALL_OTHERS, K_MSG_INTEGRATOR_REGISTER, label + "|" + channel, (key)K_ID_MESSAGELINK_INTEGRATOR);   
+}
+
+////////////////////////////////////
+// States
+////////////////////////////////////
+default {
+    state_entry(){
+      initialize();
+    }
+
+    link_message(integer sender, integer canal, string message, key id) {
+        debug ("receive message : " + message);  
+        if (canal == K_CHANNEL_INTEGRATION) {
+            if (message == K_MSG_INTEGRATION_SMOG_ON) {
+                debug ("send message to start smog"); 
+                llRegionSay(-12, "On/Off");
+            } else if (message == K_MSG_INTEGRATION_SMOG_OFF) {
+                debug ("send message to stop smog"); 
+                llRegionSay(-12, "On/Off");
+            } else if ( message == K_MSG_REZZ_PRIM) {
+                list params = llParseString2List(id, [" "], []);
+                rezzPrim(params);
+            } else if (message == K_MSG_INTEGRATION_DEBUGON) {
+                debugMode = 1;
+            } else if (message == K_MSG_INTEGRATION_DEBUGOFF) {
+                debugMode = 0;
+            }
+        }
+    }
+}
+

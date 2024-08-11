@@ -1,0 +1,376 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//  Lady Green Forensic Component     : Full Monty - STORAGE
+//
+//  Signature                         : LGF/APPS/FULLMONTY/STORAGE
+//  Component version                 : 1.0.0
+//  release date                      : August 2023
+//
+//  Description : This component is a storage. It reads a nc and deliver data to caller
+//                This script stores various data  (mainly souls).
+//
+//                It also acts as a provider of parameters for all Full Monty
+//                components.
+//
+//
+//  States description :
+//      default:
+//          current state when object is rezzed. Not initialized
+//      running:
+//          storage has been initialized
+//
+//
+//  copyright © Lady Green Forensic 2024
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3 
+//  (https://www.gnu.org/licenses/gpl-3.0.html)lcode)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+
+integer K_CANAL_MASTER = 1;
+integer K_CANAL_STORAGE = 2;
+integer K_CANAL_EVENT = 3;
+
+string K_MSG_GET= "GET";
+string K_MSG_GET_ACK  = "GET_ACK";
+string K_STORAGE_EXHAUSTED ="STORAGE_EXHAUSTED";
+
+// Bad Return codes for storage
+string K_CAPACITY_FULL = "FULL_STORAGE";
+string K_STORAGE_EMPTY = "EMPTY_STORAGE";
+string K_STORAGE_INDEX_INVALID = "STORAGE_INDEX_INVALID";
+
+// commmands from Master
+string K_MSG_RELOAD_STORAGE = "STORAGE_RELOAD";
+string K_MSG_STORAGE_DEBUGON = "STORAGE_DEBUGON";
+string K_MSG_STORAGE_DEBUGOFF = "STORAGE_DEBUGOFF";
+
+// Events Messages
+string K_MSG_EVENT_STORAGE_SOUL_STORED = "STORAGE_SOUL_STORED";
+string K_MSG_EVENT_STORAGE_INITIALIZED = "STORAGE_INITIALIZED";
+string K_IS_MSG_EVENT_STORAGE_INITIALIZED = "IS_STORAGE_INITIALIZED";
+string K_IS_MSG_EVENT_STORAGE_INITIALIZED_ACK = "IS_STORAGE_INITIALIZED_ACK";
+
+integer K_STATE_RUNNING = 0;
+integer K_STATE_PENDING = 1;
+integer K_STATE_EXHAUSTED = 2;
+
+// parameters
+string K_NOTECARD_PARAMETERS = "Choregraphy";
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+list cmd = [];
+integer index = 0;
+integer rank = 0;
+integer mustSendCmd = 0;
+
+integer ncLines=0;
+key ncQueryId;
+list parameters = [];
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+
+/***************************************************************
+** Get the rank of the script
+****************************************************************/
+integer resetState() {
+    if (rank != 0) {
+        return K_STATE_PENDING;    
+    } else {
+        return K_STATE_RUNNING;
+    }
+}
+
+/***************************************************************
+** Get the rank of the script
+****************************************************************/
+calculateRank() {
+    string scriptName = llStringTrim(llGetScriptName(), STRING_TRIM);
+    integer index = llSubStringIndex(scriptName, ".");
+    integer length = llStringLength (scriptName); 
+    if (((length-1)<=index) || (index == -1)) {
+         llOwnerSay("⛔" + " Storage script name " + scriptName + " is invalid");
+    } else {
+        string rankString = llGetSubString(scriptName, index+1, length-1);
+        rank=(integer) rankString;
+       // llOwnerSay(" Storage script named " + scriptName + " with rank "+(string)rank+" is initializing");
+    }
+}
+
+/***************************************************************
+** Read the notecards to initialize parameters
+****************************************************************/
+initNotecard(){
+
+  // clean all values
+  index = 0;
+  ncLines = 0;
+  cmd = [];
+  calculateRank();
+
+  debug ("Loading choregraphy notecard "+ getNotecardName());
+  ncQueryId = llGetNotecardLine(getNotecardName(),ncLines);
+} 
+
+string getNotecardName() {
+    return K_NOTECARD_PARAMETERS +"." + (string)rank;
+}
+/***************************************************************
+** Read one line of the parameters notecard to load
+****************************************************************/
+readnotecardLine(string lineCard) {
+    if (isCommentOrBlank(lineCard) == 0) {  
+        // do not modify the line
+        cmd += lineCard;
+        debug ("storing cmd : " + lineCard);
+    }
+} 
+
+/***************************************************************
+** check if a line is a comment line
+****************************************************************/
+integer isCommentOrBlank (string line) { 
+    integer returnValue = 0;
+    string lineStripped = llStringTrim(line, STRING_TRIM_HEAD);
+    if (lineStripped != "") {
+        integer index = llSubStringIndex(lineStripped, "**");
+         if (index == 0) {
+            returnValue = 1;   
+        }
+    } else {
+        returnValue = 1;
+    }
+    
+    return returnValue;
+}
+
+
+/***************************************************************
+** get a string parameter's value
+****************************************************************/
+string getParameterValueString(string parameterName) {
+  string value = "";
+  list values = [] + parameterName;
+  integer index = llListFindList(parameters, values);
+
+  if(index >= 0 ){
+    value = llList2String(parameters, index+1);
+  } else {
+   value = "NOT_FOUND";
+  }
+
+  return value;
+}
+
+/***************************************************************
+** get a string parameter's value
+****************************************************************/
+integer getParameterValueInteger(string parameterName) {
+    string value = getParameterValueString(parameterName);
+
+    return ((integer)value);
+}
+
+////////////////////////////////////
+// Initialize the storage capacity
+////////////////////////////////////
+initialize() {
+  debug ("Storage initialized successfully");
+}
+
+////////////////////////////////////
+// Notify storage in running mode
+////////////////////////////////////
+notifyInitialization() {
+  debug ("Storage notify its running mode on event channel");
+  string msgAck = (string)llGetListLength(cmd);
+  llMessageLinked(LINK_THIS, K_CANAL_EVENT, K_MSG_EVENT_STORAGE_INITIALIZED, (key)msgAck);
+}
+
+
+////////////////////////////////////
+// get a data
+////////////////////////////////////
+string get() {
+  string returnCode = "";
+  debug ("longueur="+(string)(llGetListLength(cmd)) + " , index=" + (string) index);
+  if (index <llGetListLength(cmd)) {
+    returnCode =  llList2String(cmd,index);
+    index = index + 1;
+  } else {
+    returnCode = K_STORAGE_EXHAUSTED;
+  }
+
+  return returnCode;
+}
+
+reinitIndex() {
+  index=0;
+  mustSendCmd = 0;
+}
+////////////////////////////////////
+// default state
+////////////////////////////////////
+default{
+  state_entry() {
+    debug ("Initializating dance choregraphy storage and load it");
+
+    llOwnerSay ("Storage named " + llGetScriptName() + " in default mode, reading the notecard.");
+    // Init choregraphy loading
+    initNotecard();
+  }
+
+  dataserver(key queryId, string data) {
+    // Process the card lines
+    if(queryId == ncQueryId) {
+      if(data != EOF) {
+          readnotecardLine(data);
+          ncQueryId = llGetNotecardLine(getNotecardName(),++ncLines);
+      } else {
+        // notecard is loaded. Initialize storage and wait for requests.
+        initialize();
+        if(rank == 0) {
+         state running;
+        } else {
+            state pending;
+        }
+      }
+    }
+  }
+}
+
+state running {
+  state_entry() {
+    notifyInitialization();
+    llOwnerSay ("✅ Storage named " + llGetScriptName() + " entering in running mode.");  
+    llMessageLinked(LINK_THIS, K_CANAL_STORAGE, K_MSG_GET, NULL_KEY);
+  }
+
+  // Processing requests from parent script
+  link_message(integer sender, integer canal, string message, key id) {
+    //debug ("receive message : " + message + "/" + (string)canal);  
+    if (canal == K_CANAL_STORAGE) {
+
+      if (message == K_MSG_RELOAD_STORAGE) {
+         state default;     
+      // Message is for the storage Component
+      } else if (message == K_IS_MSG_EVENT_STORAGE_INITIALIZED) {
+        // reset index
+        reinitIndex();
+        integer status = resetState();
+        if (status == K_STATE_RUNNING) {
+            notifyInitialization();
+        } else if (status == K_STATE_PENDING) {
+            state pending;
+        }
+      } else if (message == K_MSG_GET) {
+        // this is a request to get a parameter
+        //debug("Receive a request to get a parameter:" + (string)id);
+        string returnCode = get();
+        if (returnCode != K_STORAGE_EXHAUSTED) {
+            llMessageLinked(sender, K_CANAL_MASTER, K_MSG_GET_ACK, (key)returnCode);
+            debug (llGetScriptName() + " sending " + returnCode);
+        } else {
+            state exhausted;
+        }
+      } else if (message == K_MSG_STORAGE_DEBUGON) {
+            debugMode = 1;
+      } else if (message = K_MSG_STORAGE_DEBUGOFF) {
+            debugMode = 0;
+      }
+    }
+  }
+}
+
+state pending {
+    state_entry() {
+        llOwnerSay ("⌛ Storage named " + llGetScriptName() + " entering in pending mode.");
+    }
+    
+      // Processing requests from parent script
+  link_message(integer sender, integer canal, string message, key id) {
+    //debug ("receive message : " + message + "/" + (string)canal);  
+    if (canal == K_CANAL_STORAGE) {
+
+      if (message == K_STORAGE_EXHAUSTED) {
+          integer exhaustedRank = (integer)((string)id);
+          if (exhaustedRank == rank - 1) {
+                mustSendCmd =1;
+                state running;
+          }
+          
+      } else if (message == K_MSG_RELOAD_STORAGE) {
+         state default;     
+      // Message is for the storage Component
+      } else if (message == K_IS_MSG_EVENT_STORAGE_INITIALIZED) {
+        // reset index
+        reinitIndex();
+        integer status = resetState();
+        if (status == K_STATE_RUNNING) {
+            state running;
+        } else if (status == K_STATE_PENDING) {
+            state pending;
+        }
+      } else if (message == K_MSG_STORAGE_DEBUGON) {
+            debugMode = 1;
+      } else if (message = K_MSG_STORAGE_DEBUGOFF) {
+            debugMode = 0;
+      }
+    }
+  }
+}
+
+state exhausted {
+    state_entry() {
+        llOwnerSay ("⏩ Storage named " + llGetScriptName() + " entering in exhausted mode.");
+        llMessageLinked(LINK_THIS, K_CANAL_STORAGE, K_STORAGE_EXHAUSTED, (key)((string)(rank)));
+        // TODO : notifier tous les storages que celui-ci est exhausted. Il enverra. un message aux autres storage
+        // seuls les storages pending prendront ce message et le storage N+1 passera running. 
+    }
+
+    // Processing requests from parent script
+  link_message(integer sender, integer canal, string message, key id) {
+    //debug ("receive message : " + message + "/" + (string)canal);  
+    if (canal == K_CANAL_STORAGE) {
+
+      if (message == K_MSG_RELOAD_STORAGE) {
+         state default;     
+      // Message is for the storage Component
+      } else if (message == K_IS_MSG_EVENT_STORAGE_INITIALIZED) {
+        // reset index
+        reinitIndex();
+        integer status = resetState();
+        if (status == K_STATE_RUNNING) {
+            state running;
+        } else if (status == K_STATE_PENDING) {
+            state pending;
+        }
+        // On request to check if the storage is initialized, send the event.
+        string msgAck = (string)llGetListLength(cmd);
+        llMessageLinked(sender, K_CANAL_MASTER, K_IS_MSG_EVENT_STORAGE_INITIALIZED_ACK, (key)(msgAck));
+      } else if (message == K_MSG_STORAGE_DEBUGON) {
+            debugMode = 1;
+      } else if (message = K_MSG_STORAGE_DEBUGOFF) {
+            debugMode = 0;
+      }
+    }
+  }    
+
+}

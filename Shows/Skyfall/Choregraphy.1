@@ -1,0 +1,83 @@
+**************************************************************************
+**  Client : None
+**  Show : Test-1
+**  Choreographer : Onyrie
+**  Music : Adele - Skyfall - https://www.youtube.com/watch?v=zLtzRpNdX5g 
+*************************************************************************
+
+
+*************************************************************************
+** Executing the show
+*************************************************************************
+at 7.2119:
+    SEND Bond {FM:MOVEAV <0,0.25,0> 1}
+    SEND BondGirl1 {FM:MOVEAV <0,-0.25,0> 1}
+    SEND Bond {FM:TURN <0,0,-90> 1.2}
+    SEND BondGirl1 {FM:TURN <0,0,90> 1.2}
+    SEND Bond {FR:PLAY_STOP CD_11 Tango Petit - M} 
+    SEND BondGirl1 {FR:PLAY_STOP CD_11 Tango Petit - F} 
+    SEND BondGirl1 {FM:PLAY OMYGillian3}
+    SEND Bond {FM:PLAY VADAVST025} soi
+
+at 7.3113:
+    SEND Bond {FM:TURN <0,0,180> 1.2}
+    SEND Bond {FM:PLAY VADAVWALK01RAP}
+    SEND Bond {FM:PLAY_STOP VADAVST025}
+    SEND Bond  {FM:MOVE <-2.0,0,0> 2}
+    SEND Bond  {FM:PLAY_STOP VADAVWALK01RAP}
+    SEND Bond {FM:PLAY VADAVST025}
+    SEND Bond  {FM:TURN <0,0,180> 2}
+    
+at 7.3633:
+    SEND Bond {FM:PLAY_STOP VADAVST025}
+    SEND Bond  {FM:PLAY D1563-Crouch}
+    
+at 7.42:
+    SEND BondGirl1 {FM:PLAY D1489-Sit.G}
+    SEND BondGirl1 {FM:PLAY_STOP OMYGillian3} 
+    
+at 8.02: 
+    SEND Storyteller {FM:MSG "Il fait toujours beau au-dessus des nuages mais moi, je suis de ces oiseaux qui nous font danser sous l'orage. Je traverserais tous les nuages pour trouver la lumière en chantant sous la pluie la symphonie des éclairs." }
+    SEND Spotlight1 {FM:BEAM_OFF|FM:LIGHT_OFF|}
+    SEND Spotlight2 {FM:BEAM_OFF|FM:LIGHT_OFF|}
+    
+at 8.07:
+    SEND BondGirl1 {FM:PLAY_STOP D1489-Sit.G}
+    SEND BondGirl1 {FM:PLAY OMYAntebella3}
+    
+    
+at 8.0850:    
+    SEND Bond  {FM:PLAY  VADAVST025}
+    SEND Bond  {FM:PLAY_STOP D1563-Crouch}
+
+    
+at 8.20:    
+
+    SEND BondGirl1 {FM:PLAY_STOP OMYAntebella3}
+    SEND BondGirl1 {FM:PLAY 08WALKHAPPYSEXY}
+    SEND Bond {FM:PLAY VADAVWALK01RAP}
+    SEND Bond  {FM:PLAY_STOP  VADAVST025}
+    SEND BondGirl1  {FM:MOVE <-1.1,0,-0.12032> 1}
+    SEND Bond  {FM:MOVE <1.1,0,0.0376> 1}
+    SEND BondGirl1 {FM:PLAY_STOP 08WALKHAPPYSEXY}
+    SEND Bond  {FM:TURN <0,0,-180> 0.5}
+    SEND BondGirl1  {FM:TURN <0,0,180> 0.5}
+    SEND Bond {FM:PLAY BTCoupleBackToBackM}
+    SEND Bond {FM:PLAY_STOP VADAVWALK01RAP}
+    SEND BondGirl1 {FM:PLAY BTCoupleBackToBackF}
+    
+at 8.2050:
+    SEND Background {FM:ALTER 0 3}
+
+at 8.25:
+    CMD 71 off
+
+at 8.28:
+    SEND LightningMachine {FM:LIGHTNING}
+    
+ at 8.32:   
+    SEND Curtains {FM:CLOSE_CURTAIN_BACK} 
+    
+at 8.36:
+    SMOG OFF 
+    SEND Rain {FM:RAIN_OFF} 

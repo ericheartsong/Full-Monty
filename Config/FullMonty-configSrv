@@ -1,0 +1,138 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Lady Green Forensic Component     : FULLMONTY - CONFIGSRV
+//
+//  Signature                         : LGF/APPS/FULLMONTY/CONFIGSRV
+//  Component version                 : 1.0.0
+//  release date                      : August 2023
+//
+//  Description : This component is the soul catcher of BYOS SYSTEM.
+//                This script stores various data  (mainly souls).
+//
+//                It also acts as a provider of parameters for all BYOS
+//                components.
+//
+//  States description :
+//      default:
+//          current state when object is rezzed. Reading the nc
+//      running:
+//          when the script is ready to de
+//
+//
+//  copyright © Lady Green Forensic 2023
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3 
+//  (https://www.gnu.org/licenses/gpl-3.0.html)lcode)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0.0"; // version of the component
+
+// Communication with other scripts in prim
+integer K_CHANNEL_CONFIG = 9;
+string K_ID_MESSAGELINK_CONFIG_FROM= "CONFIGURATION_FROM";
+string K_ID_MESSAGELINK_CONFIG_TO= "CONFIGURATION_TO";
+string K_MSG_SEND_CONFIG = "SEND_CONFIG";
+// parameters
+string K_NOTECARD_PARAMETERS = "config";
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+list cmd = [];
+integer index = 0;
+
+integer ncLines=0;
+key ncQueryId;
+list parameters = [];
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+/***************************************************************
+** Read the notecards to initialize parameters
+****************************************************************/
+initNotecard(){
+
+  // clean all values
+  index = 0;
+  ncLines = 0;
+  parameters = [];
+
+  debug ("Loading config notecard "+ K_NOTECARD_PARAMETERS);
+  ncQueryId = llGetNotecardLine(K_NOTECARD_PARAMETERS,ncLines);
+}
+
+/***************************************************************
+** Read one line of the parameters notecard to load
+****************************************************************/
+readnotecardLine(string lineCard) {
+  // do not modify the line
+  parameters += lineCard;
+  debug ("storing paraneter : " + lineCard);
+}
+
+sendConfig() {
+    integer i = 0;
+    integer lines = llGetListLength(parameters);
+    string msg = "";
+    
+    for (;i<lines; i++) {
+        string buffer = llList2String(parameters, i);
+        list paramValue = llParseString2List(buffer, ["=", " "], []);
+        msg = msg + "Param" + llDumpList2String(paramValue, "|") + "|";
+    }
+    debug ("list of config to send : " + msg);
+    llMessageLinked(LINK_SET, K_CHANNEL_CONFIG, msg, (key)K_ID_MESSAGELINK_CONFIG_FROM);
+}
+
+////////////////////////////////////
+// default state
+////////////////////////////////////
+default{
+  state_entry() {
+    debug ("Reading config files");
+
+    // Init config nc loading
+    initNotecard();
+  }
+
+  dataserver(key queryId, string data) {
+    // Process the card lines
+    if(queryId == ncQueryId) {
+      if(data != EOF) {
+          readnotecardLine(data);
+          ncQueryId = llGetNotecardLine(K_NOTECARD_PARAMETERS,++ncLines);
+      } else {
+        // notecard is loaded. Initialize storage and wait for requests.
+        sendConfig();
+        //llSetScriptState(llGetScriptName(),FALSE);
+      }
+    }
+  }
+  
+      
+  link_message(integer Sender, integer Number, string String, key Key) {
+      
+      if ((string)Key == K_ID_MESSAGELINK_CONFIG_TO) {
+        if (String == K_MSG_SEND_CONFIG) {
+            sendConfig();
+        }
+      }
+  }
+  
+}
+
+
+

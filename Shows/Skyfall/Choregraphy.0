@@ -1,0 +1,164 @@
+**************************************************************************
+**  Client : None
+**  Show : Test-1
+**  Choreographer : Onyrie
+**  Music : Adele - Skyfall - https://www.youtube.com/watch?v=zLtzRpNdX5g 
+*************************************************************************
+
+
+*************************************************************************
+** Configuring channel communications
+*************************************************************************
+CHANNELCMD 3
+CHANNELMOVER 100
+
+*************************************************************************
+** Registering integrated and active components
+*************************************************************************
+REGISTER Spotlight1 -9991
+REGISTER Spotlight2 -9992
+REGISTER Storyteller -8850
+REGISTER Bond-disrober -9999
+REGISTER Background -8851
+REGISTER BigBen -8852
+REGISTER LightningMachine -8853
+REGISTER Curtains -8854
+*************************************************************************
+** Preparing the scene
+************************************************************************
+WAITORDER start
+REZZ FM-MOVER-Basic-F1 BondGirl1  <1.5,-0.2,1.90526> <0,0,125> <0,0,0.1> <0,0,0> OMYAntebella3
+REZZ FM-MOVER-Basic-M Bond  <-7.87297,0,1.85437> <0,0,0> <0,0,0.1> <0,0,0> U1
+REZZPRIM FM-SimplestRain Rain -8855 <0,-1.77133,8.44199> <0,0,0>
+HANDSHAKE
+
+WAITORDER ready
+SEND Rain {FM:RAIN_OFF}
+SEND Background {FM:ALTER 0 1}
+SEND Background {FM:SET 0}
+SEND Spotlight1 {FM:BEAM_OFF|FM:LIGHT_OFF|}
+SEND Spotlight2 {FM:BEAM_OFF|FM:LIGHT_OFF|}
+SEND Curtains {FM:CLOSE_CURTAIN_FRONT}
+SEND Curtains {FM:CLOSE_CURTAIN_BACK}
+CMD 71 off 
+SMOG ON
+
+WAITORDER dance
+
+*************************************************************************
+** Executing the show
+*************************************************************************
+at 0.00:
+    SEND Curtains {FM:OPEN_CURTAIN_BACK}  
+    
+at 0.05:    
+    SEND Storyteller {FM:MSG "By the truth we are undone. Life is a dream. 'Tis the waking that kills us. He who robs us of our dreams robs us of our life ― Virginia Woolf, Orlando"}
+   
+at 0.20:
+    SEND Storyteller {FM:MSG "Par la vérité, nous sommes perdus. La vie est un rêve. C'est le réveil qui nous tue. Celui qui nous vole nos rêves nous vole notre vie ― Virginia Woolf, Orlando"} 
+   
+at 0.35:
+    SEND Background {FM:ALTER 100 3}
+    
+at 0.42:
+    SEND BigBen {FM:PLAY_SOUND BB1 1.0}
+    
+at 1.04:
+    SEND BigBen {FM:PLAY_SOUND BB2 1.0}  
+    CMD 71 on 
+
+at 1.08:
+    SEND Spotlight1 {FM:BEAM_ON_OBJECT $key(BondGirl1)|FM:LIGHT_ON|FM:BEAM_COLOR <0.6,0.6,1.0>} 
+
+at 1.12:
+     SEND Spotlight2 {FM:BEAM_ON_AGENT $keyAv(Bond)|FM:LIGHT_ON|FM:BEAM_COLOR <0.6,0.6,1.0>}
+
+at 1.15:
+    SEND Bond {FM:PLAY_STOP U1}:
+    SEND Bond {FM:PLAY VADAVST025}
+        ## SEND Bond-disrober {FM:REMOVEOUTFIT adele-1}
+
+at 1.20:
+    SEND Bond {FM:PLAY_STOP VADAVST025}
+    SEND Bond {FM:PLAY behind7}
+    ## SEND Bond-disrober {FM:ADDOUTFIT adele-1}
+        
+at 1.22:
+        SEND Bond {FM:PLAY_STOP behind7}
+        SEND Bond {FM:PLAY VADAVWALK01RAP}
+        SEND Bond {FM:MOVE <7.87297,0,0> 3}    
+
+at 1.25:
+        SEND Bond {FM:PLAY_STOP VADAVWALK01RAP}
+        SEND Bond {FM:PLAY VADAVST025}
+
+at 1.27:
+
+        SEND Bond {FM:PLAY_STOP VADAVST025}
+        SEND Bond {FM:PLAY behind7}
+
+at 1.32:
+        SEND Bond {FM:PLAY_STOP behind7}
+        SEND Bond {FM:PLAY VANANAKIZOMBA05}
+
+at 1.4440:
+        SEND BondGirl1 {FM:PLAY_STOP OMYAntebella3}
+        SEND BondGirl1 {FM:PLAY VANANAKIZOMBA06}
+        SEND BondGirl1 {FM:TURN <0,0,90> 4}
+
+at 2.34:
+    SEND BondGirl1 {FM:TURN <0,0,-35> 4}
+    SEND BondGirl1 {FM:MOVE <0.06,0.1,0> 4}
+    SEND Bond  {FM:MOVE <1.02,-0.1,0> 8}
+
+at 2.4220:
+    SEND BondGirl1 {FM:PLAY_STOP VANANAKIZOMBA06}
+    SEND Bond {FM:PLAY_STOP VANANAKIZOMBA05}
+    SEND Spotlight1 {FM:LIGHT_ON|FM:BEAM_COLOR <0.6,0.4,0.8>|FM:BEAM_TRANSPARENCY 0.08}
+    SEND Spotlight2 {FM:LIGHT_ON|FM:BEAM_COLOR <0.6,0.4,0.8>|FM:BEAM_TRANSPARENCY 0.08}
+    SEND Bond {FM:PLAY VMDBOLERO02} 
+    SEND BondGirl1 {FM:PLAY VFDBOLERO02} 
+
+at 3.4050:
+    SEND BondGirl1 {FM:PLAY_STOP VFDBOLERO02}
+    SEND Bond {FM:PLAY_STOP VMDBOLERO02}
+    SEND Bond {FM:PLAY VMDBOLERO03} 
+    SEND BondGirl1 {FM:PLAY VFDBOLERO03} 
+    
+at 4.4040:
+    SEND Bond {FM:PLAY_STOP VMDBOLERO03} 
+    SEND BondGirl1 {FM:PLAY_STOP VFDBOLERO03} 
+    SEND Bond {FM:TURN <0,0,-90> 1.2}
+    SEND BondGirl1 {FM:TURN <0,0,90> 1.2}
+    SEND Bond {FM:MOVE <0.02,0,0> 0.1}
+    SEND BondGirl1 {FM:MOVE <-0.02,0,0> 0.1}
+    SEND Bond {FM:MOVEAV <0,0.25,0> 0.1}
+    SEND BondGirl1 {FM:MOVEAV <0,-0.25,0> 0.1}
+    SEND Spotlight1 {FM:LIGHT_ON|FM:BEAM_COLOR <0.6,0.0,0.0>|FM:BEAM_TRANSPARENCY 0.10}
+    SEND Spotlight2 {FM:LIGHT_ON|FM:BEAM_COLOR <0.6,0.0,0.0>|FM:BEAM_TRANSPARENCY 0.10}
+    SEND LightningMachine {FM:LIGHTNING}
+    SEND Bond {FR:PLAY CD_117 Tango Petit 2 - M} 
+    SEND BondGirl1 {FR:PLAY CD_117 Tango Petit 2 - F}
+    
+at 4.4440:
+    SEND BigBen {FM:PLAY_SOUND ThunderSL1 1.0} 
+    SEND Rain {FM:RAIN_ON}   
+    
+at 5.4585:
+    SEND Bond {FM:MOVEAV <0,-0.25,0> 0.1} 
+    SEND BondGirl1 {FM:MOVEAV <0,0.25,0> 0.1}
+    SEND Bond {FR:PLAY_STOP CD_117 Tango Petit 2 - M} 
+    SEND BondGirl1 {FR:PLAY_STOP CD_117 Tango Petit 2 - F}
+    SEND Bond {FM:TURN <0,0,180> 0.05}
+    SEND BondGirl1 {FM:TURN <0,0,180> 0.05}   
+    SEND Spotlight1 {FM:LIGHT_ON|FM:BEAM_COLOR <0.4,0.0,0.0>|FM:BEAM_TRANSPARENCY 0.2}
+    SEND Spotlight2 {FM:LIGHT_ON|FM:BEAM_COLOR <0.4,0.0,0.0>|FM:BEAM_TRANSPARENCY 0.2}
+    SEND LightningMachine {FM:LIGHTNING}     
+    SEND Bond {FR:PLAY CD_11 Tango Petit - M} 
+    SEND BondGirl1 {FR:PLAY CD_11 Tango Petit - F} 
+    SEND Bond {FM:MOVEAV <0,-0.25,0> 1}
+    SEND BondGirl1 {FM:MOVEAV <0,0.25,0> 1}
+    
+at 5.4785:
+    SEND BigBen {FM:PLAY_SOUND ThunderSL2 1.0}        
+    

@@ -1,0 +1,379 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//  Lady Green Forensic Component     : FULLMONTY - INTEGRATOR
+//
+//  Signature                         : LGF/APPS/FULLMONTY/INTEGRATOR
+//  Component version                 : 1.0.0
+//  release date                      : August 2023
+//
+//  Description : This component allow some interactions between the FM 
+//                orchestrator and all other components executing commands defined
+//                in a choregraphy.
+//
+//
+//  copyright © Lady Green Forensic 2023
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3 
+//  (https://www.gnu.org/licenses/gpl-3.0.html)lcode)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+
+string K_ID_MESSAGELINK_INTEGRATOR = "INTEGRATOR";
+integer K_MSG_INTEGRATOR_REGISTER = 1;
+integer K_MSG_INTEGRATOR_HANDSHAKE = 2;
+integer K_MSG_INTEGRATOR_RESET = 3;
+integer K_MSG_INTEGRATOR_SEND = 4;
+integer K_MSG_INTEGRATOR_MODE_REHEARSAL = 5; 
+integer K_MSG_INTEGRATOR_MODE_SHOW = 6;
+float K_MAX_HANDSHAKE_SEC = 20.0;
+integer HANDSHAKE_CHANNEL = -10721;
+
+string K_ERR_INTEGRATOR_001 = "ERR_INTEGRATOR_001 : Invalid component registration";
+
+string K_HEADER_MSG_HANDSHAKE = "FM:HANDSHAKE";
+string K_HEADER_MSG_AVATARSIT = "FM:HANDSHAKE:AVATARSIT";
+string K_HEADER_MSG_REHEARSAL = "FM:REHEARSAL_MODE";
+string K_HEADER_MSG_SHOW_MODE = "FM:SHOW_MODE";
+string K_HEADER_MSG_KILL      = "FM:KILL";
+integer K_HANDSHAKE_STATUS_OK = 0;
+integer K_HANDSHAKE_STATUS_WARNING = 1;
+integer K_HANDSHAKE_STATUS_ERROR = 2;
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+list dynamicMovers = []; // temporary information to store dynamic movers configuration
+list components = [];  // components includes dynamicMovers.
+list connectedComponents = []; // components that have already answered to a handshake
+list componentsAvatarSit = []; // components that have an avatar sit on them
+key initiatorId = NULL_KEY; // person who sent an handshake or a validate component process
+integer listenHandle = 0; // Handle of the listen for the handshake
+integer statusHandshake = K_HANDSHAKE_STATUS_OK; // 0 = no warning during handshake, 1 = warning during handshake, 2 = error
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+////////////////////////////////////
+// Error function
+////////////////////////////////////
+error (string errorCode, string pLog) {
+    llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + errorCode + ":  " + pLog);
+}
+
+
+////////////////////////////////////
+// Register component integrated with orchestrator
+////////////////////////////////////
+registerComponent (string msg) {
+
+    list tokens = llParseString2List(msg, ["|"], []);
+    if ( llGetListLength(tokens) < 2) {
+        error(K_ERR_INTEGRATOR_001, msg);
+    } else {
+        components += llList2String (tokens, 0);
+        components += llList2String (tokens, 1);
+    }
+}
+
+////////////////////////////////////
+// Execute the handshake components
+////////////////////////////////////
+executeHandshakeComponents () {
+
+    // we loop on all components
+    // we set a timer
+    integer i = 0;
+    integer maxComp = llGetListLength(components);
+    for (;i<maxComp; i = i+2) {
+        string name = llList2String(components, i);
+        string channel = llList2String(components, i+1);
+        llRegionSay((integer) channel, K_HEADER_MSG_HANDSHAKE+ "," + name);
+        debug ("Send a handshake message on channel " + channel + " " + K_HEADER_MSG_HANDSHAKE+ "," + name);
+    }
+    
+    llSetTimerEvent(K_MAX_HANDSHAKE_SEC);
+}
+
+////////////////////////////////////
+// Launch the handshake components
+////////////////////////////////////
+launchHandshakeComponents (key id) {
+    initiatorId = id;
+    connectedComponents = [];
+    componentsAvatarSit = [];
+    statusHandshake = K_HANDSHAKE_STATUS_OK;
+}
+
+launchResetComponents() {
+     // we loop on all components
+    integer i = 0;
+    integer maxComp = llGetListLength(connectedComponents);
+    for (;i<maxComp; i = i+3) {
+        string name = llList2String(connectedComponents, i);
+        string channel = llList2String(connectedComponents, i+1);
+        string id =  llList2String(connectedComponents, i+2);
+        llRegionSayTo((key)id, (integer) channel, K_HEADER_MSG_KILL);
+    }
+}
+
+////////////////////////////////////
+// Launch the handshake components
+////////////////////////////////////
+displayHandshakeResult() {
+    integer i = 0;
+    integer maxComp = llGetListLength(components);
+    
+    debug (" Liste des components  " + llDumpList2String(components, ","));
+    debug (" Liste des components connectés " + llDumpList2String(connectedComponents, ","));
+    
+    for (;i<maxComp; i=i+2) {
+        // this is the name of a components
+        string name = llList2String(components, i);
+        
+        //Is he connected
+        debug ("nom compoment recherché: " + name);
+        integer index = llListFindList (connectedComponents, [] + name);
+        
+        if (index == -1) {
+            llRegionSayTo(initiatorId, PUBLIC_CHANNEL, name + " did not respond to handshake. Please check.");
+            statusHandshake = K_HANDSHAKE_STATUS_ERROR;
+        }
+    }
+    string statusResult = " End of the handshake process of FM components";
+    if (statusHandshake == K_HANDSHAKE_STATUS_OK) {
+        statusResult = "✅" + statusResult + " with success.";
+    } else if (statusHandshake == K_HANDSHAKE_STATUS_WARNING) {
+        statusResult = "⚠" + statusResult + " with warning(s).";
+    } else if (statusHandshake == K_HANDSHAKE_STATUS_ERROR) {
+        statusResult = "⛔" + statusResult + " with error(s).";
+    }
+    llRegionSayTo(initiatorId, PUBLIC_CHANNEL, statusResult);  
+}
+
+////////////////////////////////////
+// Add a component that answered to the handshake
+////////////////////////////////////
+integer connectComponent (string name, key id) {
+    integer returnValue = 0;
+    string ownerName = llGetDisplayName(llGetOwnerKey(id));// get their name (if the owner is in the same sim)
+    
+    if (llListFindList(connectedComponents, [] + name) < 0) {
+        integer index = llListFindList(components, [] + name);
+        if (index >=0) {
+            string channel = llList2String(components, index+1);
+            connectedComponents += name;
+            connectedComponents += channel;
+            connectedComponents += (string)id;
+            llRegionSayTo(initiatorId, PUBLIC_CHANNEL, name + " owned by " + ownerName + " just answered to handshake.");
+        }
+        integer sizeComp = llGetListLength(components);
+        integer sizeCompConnected = llGetListLength(connectedComponents);
+        if ((sizeComp * 3) == (sizeCompConnected * 2)) {
+            returnValue = 1;
+        }
+    } else {
+        statusHandshake = K_HANDSHAKE_STATUS_WARNING;
+        llRegionSayTo(initiatorId, PUBLIC_CHANNEL, "Warning: " + name + " owned by " + ownerName + " already registered. Please check.");
+    }
+    
+    return returnValue;
+}
+
+////////////////////////////////////
+// Send a command to a component
+////////////////////////////////////
+sendMessage (string message) {
+    list msgCmd = llParseString2List(message, ["|"], []);
+    string componentName = llList2String(msgCmd, 0);
+    
+    debug ("Component name recipient of the message: (" + componentName + ")"  );
+    // look for the uuid of the component. Search component by name
+    integer index = llListFindList (connectedComponents, []+componentName);
+    integer channel = llList2Integer(connectedComponents, index+1);
+    key uuid = llList2String(connectedComponents, index+2);
+    debug ("Dump connecterComponents " + llDumpList2String(connectedComponents, ","));
+    
+    // prepare the message
+    integer indexStartMsg = llSubStringIndex(message, "{");
+    integer indexEndMsg = llSubStringIndex(message, "}");
+    string msgToSend = llGetSubString(message, indexStartMsg+1, indexEndMsg-1);
+    
+    // replace key by value
+    msgToSend = replaceKeywordsinCommand(msgToSend);
+    
+    // send it    
+    llRegionSayTo(uuid, channel, msgToSend);
+    debug ("Message sent to " + componentName + "/" + (string)uuid + " on channel "+ (string)channel + " : " + msgToSend);
+}
+
+string replaceKeywordsinCommand(string msgToSend) {
+    string returnMsg = msgToSend;
+    
+    integer i = 0;
+    integer nbComponentsConnected = llGetListLength (connectedComponents);
+    string componentName="";
+    string uuidComponentName="";
+    
+    debug (" Liste des avatars assis  " + llDumpList2String(componentsAvatarSit, ",")); 
+    for (;i<nbComponentsConnected; i=i+3) {
+        componentName = llList2String(connectedComponents, i);
+        uuidComponentName = llList2String(connectedComponents, i+2);
+        returnMsg = llReplaceSubString(returnMsg, "$key("+componentName + ")", uuidComponentName, 0);
+        integer index = llListFindList(componentsAvatarSit, []+componentName);
+        if (index != -1) {
+            string uuidAvatarSit = llList2String(componentsAvatarSit, index+1);
+            debug ("replacekeyword :"  + componentName  + " for " + uuidAvatarSit );
+            returnMsg = llReplaceSubString(returnMsg, "$keyAv("+componentName + ")", uuidAvatarSit, 0);
+        }
+    }
+    
+    return returnMsg;
+}
+
+////////////////////////////////////
+// string replace
+////////////////////////////////////
+string strReplace(string str, string search, string replace) {
+    return llDumpList2String(llParseStringKeepNulls((str = "") + str, [search], []), replace);
+}
+
+////////////////////////////////////
+// store list of sit avatart
+////////////////////////////////////
+storeAvatarOnConnectedComponent (key uuidAvatar, key uuidComponent) {
+    debug ("StoreAvatatOnConnectedComponent: uuidAVatar= " + (string) uuidAvatar + ", component= "+ (string) uuidComponent);
+    debug (" Liste des components connectés " + llDumpList2String(connectedComponents, ","));
+    integer index = llListFindList (connectedComponents, []+(string)uuidComponent);
+    if (index != -1) {
+        string componentName = llList2String(connectedComponents, index-2);
+        componentsAvatarSit += componentName;
+        componentsAvatarSit += (string)uuidAvatar;
+        llRegionSayTo(initiatorId, PUBLIC_CHANNEL, "Avatar " + llGetDisplayName(uuidAvatar) + " sit on " + componentName);
+    } else {
+        llRegionSayTo(initiatorId, PUBLIC_CHANNEL, "Cannot find component "+ (string) uuidComponent + " for sit avatar " + llGetDisplayName(uuidAvatar));
+    }
+}
+
+changeMode(integer mode) {
+    string msg = K_HEADER_MSG_SHOW_MODE;
+    if (mode == K_MSG_INTEGRATOR_MODE_REHEARSAL) {
+        msg = K_HEADER_MSG_REHEARSAL;
+    }
+    
+    // we loop on all components
+    integer i = 0;
+    integer maxComp = llGetListLength(components);
+    for (;i<maxComp; i = i+2) {
+        string name = llList2String(components, i);
+        string channel = llList2String(components, i+1);
+        llRegionSay((integer) channel, msg);
+    }  
+}
+
+default
+{
+    state_entry() {
+        llSetTimerEvent (0);
+        listenHandle = llListen(HANDSHAKE_CHANNEL, "", NULL_KEY, "");
+    }
+    
+    link_message(integer sender_num, integer idMessage, string msg, key idTarget) {
+        if ((string)idTarget == K_ID_MESSAGELINK_INTEGRATOR) {
+            if (idMessage == K_MSG_INTEGRATOR_REGISTER) {
+                registerComponent(msg);
+            } else if (idMessage == K_MSG_INTEGRATOR_HANDSHAKE) {
+                launchHandshakeComponents((key) msg);
+                // delayed handshake
+                llSetTimerEvent (2.0);
+            } else if (idMessage == K_MSG_INTEGRATOR_RESET) {
+                launchResetComponents();
+                llResetScript();
+            } else if (idMessage == K_MSG_INTEGRATOR_SEND) {
+                sendMessage(msg);
+            }  else if (idMessage == K_MSG_INTEGRATOR_MODE_REHEARSAL) {
+                changeMode(K_MSG_INTEGRATOR_MODE_REHEARSAL);
+            }  else if (idMessage == K_MSG_INTEGRATOR_MODE_SHOW) {
+                changeMode(K_MSG_INTEGRATOR_MODE_SHOW);
+            } 
+        }
+    }
+    
+    listen( integer channel, string name, key id, string message ) {
+        if (channel == HANDSHAKE_CHANNEL) {
+            debug ("received handshake msg : " + message + " id=" + (string)id);
+            list response = llParseString2List(message, [","],[]);
+            string cmd = llList2String(response,0);
+            if (cmd == K_HEADER_MSG_AVATARSIT) {
+                string avatarId = llList2String(response,1);
+                storeAvatarOnConnectedComponent((key)avatarId,id);
+            }
+            
+        }
+    }
+    
+    timer() {
+        //delayed handshake;
+        llSetTimerEvent (0);
+        state handshake; 
+    }
+    
+    on_rez(integer start_param) {
+       llResetScript(); 
+    }
+
+}
+
+state handshake {
+    state_entry() {
+        llRegionSayTo(initiatorId, PUBLIC_CHANNEL, "Initiating the handshake process of FM components...");
+        listenHandle = llListen(HANDSHAKE_CHANNEL, "", NULL_KEY, "");
+        executeHandshakeComponents();
+    }
+    
+    listen( integer channel, string name, key id, string message ) {
+        if (channel == HANDSHAKE_CHANNEL) {
+            debug ("received handshake msg : " + message + " id=" + (string)id);
+            list response = llParseString2List(message, [","],[]);
+            string header = llList2String(response,0);
+            if (header == K_HEADER_MSG_HANDSHAKE) {
+                integer status = connectComponent (llList2String(response,1), id);
+                if (status == 1) {
+                    state default;
+                }
+            }
+            
+        }
+    }
+    
+    timer() {
+        llSetTimerEvent(0.0);
+        state default;
+    } 
+    
+    link_message(integer sender_num, integer idMessage, string msg, key idTarget) {
+        debug ("received msg : " + msg);
+        if ((string)idTarget == K_ID_MESSAGELINK_INTEGRATOR) {
+            if (idMessage == K_MSG_INTEGRATOR_RESET) {
+                llResetScript();
+            }
+        }
+    }
+    
+    state_exit() {
+        llListenRemove(listenHandle);
+        displayHandshakeResult();
+        debug ("exit of handshake state"); 
+    }
+}
