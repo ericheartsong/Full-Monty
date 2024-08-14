@@ -1,0 +1,98 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Lady Green Forensic Component     : FULL MONTY - LIGHTNING
+//
+//  Signature                         : LGF/APPS/FM/LIGHNING
+//  Component version                 : 1.0.0
+//  release date                      : June 2024
+//
+//  Description : This component displays a texture and may alter it
+//
+//  States description :
+//      default: default state.
+//
+//  copyright © Lady Green Forensic 2021
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3
+//  (https://www.gnu.org/licenses/gpl-3.0.html)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+string K_ID_MESSAGELINK_FMPROTOCOL="FMPROTOCOL";
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+list eclair;
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+displayEclair() {
+    debug ("displayEclair");
+    if (llGetListLength(eclair)>0) {
+        string str = llList2String (eclair, 0);
+        list parameters = llParseString2List(str, ["|"],[]);
+
+        float length =  llList2Float(parameters,0);
+        float glow =  llList2Float(parameters,1);
+        float delay =  llList2Float(parameters,2);
+
+        llSetLinkPrimitiveParamsFast( LINK_THIS,[ PRIM_GLOW, ALL_SIDES,  glow ]);
+        llSleep(length);
+        llSetLinkPrimitiveParamsFast( LINK_THIS,[ PRIM_GLOW, ALL_SIDES,  0 ]);
+        eclair = llDeleteSubList(eclair, 0,0);
+        llSetTimerEvent(delay);
+    } else {
+        llSetTimerEvent(0.0);
+    }
+
+}
+
+////////////////////////////////////
+// Main
+////////////////////////////////////
+default
+{
+    state_entry() {
+        llSetTimerEvent(0.0);
+    }
+
+    link_message(integer source, integer num, string str, key id) {
+        debug ("received message : "+ str);
+        if((string)id == K_ID_MESSAGELINK_FMPROTOCOL) {
+            list parameters = llParseString2List(str, [" "],[]);
+            string cmd = llStringTrim(llList2String(parameters,0), STRING_TRIM);
+            float destAlpha = llList2Float(parameters,1);
+            debug ("cmd : "+ cmd);
+            if (cmd == "FM:LIGHTNING") {
+                eclair += "0.01|0.3|0.2";
+                eclair += "0.1|0.5|0.3";
+                eclair += "0.1|0.3|0.0";
+                displayEclair();
+            }
+        }
+    }
+
+    timer(){
+        displayEclair();
+    }
+
+    on_rez(integer start_param) {
+        // Redémarre le script à chaque fois que l’objet est rez
+        llResetScript();
+    }
+}

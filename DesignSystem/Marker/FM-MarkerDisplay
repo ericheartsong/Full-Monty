@@ -1,0 +1,162 @@
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "0.2.0"; // version of the component
+
+vector COLOR_WHITE = <1.0, 1.0, 1.0>;
+float  OPAQUE      = 1.0;
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 1;
+string groupName="";
+string arrivalTime = "";
+string departureTime = "";
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+integer noMatch (string src, string pattern) {
+
+    if (llSubStringIndex(src, pattern) > -1) {
+        llSay (PUBLIC_CHANNEL, "FM Error ERR_MARKER_003 : Invalid description for a marker -" + src + " - " + pattern + " is forbidden");
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+integer match (string src, string pattern) {
+
+    if (llSubStringIndex(src, pattern) > -1) {
+        return 1;
+    } else {
+        llSay (PUBLIC_CHANNEL, "FM Error ERR_MARKER_002 : Invalid description for a marker -" + src + " - " + pattern + " is forbidden");
+        return 0;
+    }
+}
+
+float String2Float(string ST)
+{
+    list nums = ["0","1","2","3","4","5","6","7","8","9",".","-"];
+    float FinalNum = 0.0;
+    integer idx = llSubStringIndex(ST,".");
+    if (idx == -1)
+    {
+        idx = llStringLength(ST);
+    }
+    integer Sgn = 1;
+    integer j;
+    for (j=0;j< llStringLength(ST);j++)
+    {
+        string Char = llGetSubString(ST,j,j);
+        if (~llListFindList(nums,[Char]))
+        {
+            if((j==0) && (Char == "-"))
+            {
+                Sgn = -1;
+            }
+            else if (j < idx)
+            {
+                FinalNum = FinalNum + (float)Char * llPow(10.0,((idx-j)-1));
+            }
+            else if (j > idx)
+            {
+                FinalNum = FinalNum + (float)Char * llPow(10.0,((idx-j)));
+            }
+        }
+    }
+    return FinalNum * Sgn;
+}
+
+integer validateSyntax (string src) {
+    string trimmerSrc = llStringTrim (src, STRING_TRIM);
+
+    // Check presence of :
+    integer index = llSubStringIndex(trimmerSrc, ":");
+    if (index <= 0) {
+        llSay (PUBLIC_CHANNEL,"FM Error ERR_MARKER_004 : Invalid description for a marker -" + src + " - no group name.");
+        return 0;
+    } else {
+        groupName = llGetSubString(trimmerSrc, 0, index-1);
+    }
+
+    // Check presence of ->
+    string afterDeuxPoints = llGetSubString(trimmerSrc, index+1, llStringLength(trimmerSrc)-1);
+    integer index2 = llSubStringIndex(afterDeuxPoints, "->");
+    if (index2 < 0) {
+        llSay (PUBLIC_CHANNEL, "FM Error ERR_MARKER_005 : Invalid description for a marker -" + src + " - no time separator.");
+        return 0;
+    }
+
+    // Validate arrival time
+    arrivalTime = llGetSubString(afterDeuxPoints, 0, index2 -1);
+    arrivalTime = llStringTrim(arrivalTime, STRING_TRIM);
+    if (String2Float(arrivalTime) == 0.0) {
+        llSay (PUBLIC_CHANNEL, "FM Error ERR_MARKER_006 : Invalid description for a marker -" + src + " - no arrival time.");
+
+        return 0;
+    }
+
+    // Validate departure time
+    departureTime = llGetSubString(afterDeuxPoints, index2+1, llStringLength(trimmerSrc)-1);
+    departureTime = llStringTrim(departureTime, STRING_TRIM);
+    if (String2Float(departureTime) == 0.0) {
+        llSay (PUBLIC_CHANNEL, "FM Error ERR_MARKER_007 : Invalid description for a marker -" + src + " - no departure time.");
+        return 0;
+    }
+
+    return 1;
+}
+
+integer validateTitle (string title) {
+    integer returnValue;
+
+    returnValue = noMatch (title, "|");
+    debug("returnValue noMatch : " + (string)returnValue);
+    if (returnValue == 1) {
+        returnValue = validateSyntax(title);
+        debug("returnValue validateSyntax : " + (string)returnValue);
+    }
+    return returnValue;
+}
+
+updateTitle() {
+    string title = llGetObjectDesc();
+
+    if (validateTitle(title) == 1) {
+        llSetText(title, COLOR_WHITE, OPAQUE);
+        llMessageLinked(LINK_ALL_OTHERS, 0, groupName+"|"+arrivalTime+"|"+departureTime, (key)"REFRESH");
+    } else {
+        llSay (PUBLIC_CHANNEL, "FM Error ERR_MARKER_001 : Invalid description for a marker - " + title);
+    }
+}
+
+////////////////////////////////////
+// Main
+////////////////////////////////////
+default
+{
+    state_entry() {
+        updateTitle();
+    }
+
+
+    touch_start(integer total_number) {
+        updateTitle();
+    }
+
+    on_rez(integer start_param) {
+        llResetScript();
+    }
+
+}
+
+

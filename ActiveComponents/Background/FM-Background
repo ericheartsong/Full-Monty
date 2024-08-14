@@ -1,0 +1,109 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Lady Green Forensic Component     : FULL MONTY - BACKGROUND
+//
+//  Signature                         : LGF/APPS/FM/BACKGROUND
+//  Component version                 : 1.0.0
+//  release date                      : June 2024
+//
+//  Description : This component displays a texture and may alter it
+//
+//  States description :
+//      default: default state.
+//
+//  copyright © Lady Green Forensic 2024
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3
+//  (https://www.gnu.org/licenses/gpl-3.0.html)lcode)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+string K_ID_MESSAGELINK_FMPROTOCOL="FMPROTOCOL";
+string K_TRANSFORM_TRANSPARENCY = "FM:ALTER TRANSPARENCY";
+integer K_FACE_BACKGROUND = 2;
+integer K_NB_INCREMENT_PER_SECOND = 10;
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+float currentTransparency = 0;
+float incrementTransparency = 0;
+string transformation = "";
+integer timerCounter = 0;
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+alterTransparency (float destAlpha, float duration) {
+    debug ("entrée alterTransparency");
+    float diff = destAlpha - currentTransparency;
+    incrementTransparency = diff / (duration * K_NB_INCREMENT_PER_SECOND);
+    transformation = K_TRANSFORM_TRANSPARENCY;
+    timerCounter = (integer)(duration * K_NB_INCREMENT_PER_SECOND);
+
+    llSetTimerEvent(1.0/K_NB_INCREMENT_PER_SECOND);
+}
+
+updateTransparency() {
+    debug ("entrée updateTransparency");
+    timerCounter --;
+    currentTransparency = currentTransparency+incrementTransparency;
+    llSetAlpha(1 - (currentTransparency/100), K_FACE_BACKGROUND);
+    debug ("currentTransparency=" + (string) currentTransparency);
+    if (timerCounter == 0) {
+        llSetTimerEvent(0);
+    }
+
+}
+
+default
+{
+    state_entry() {
+    }
+
+    link_message(integer source, integer num, string str, key id) {
+        debug ("received message : "+ str);
+        if((string)id == K_ID_MESSAGELINK_FMPROTOCOL) {
+            list parameters = llParseString2List(str, [" "],[]);
+            string cmd = llStringTrim(llList2String(parameters,0), STRING_TRIM);
+            float destAlpha = llList2Float(parameters,1);
+            debug ("cmd : "+ cmd);
+            if (cmd == "FM:ALTER") {
+                float delay = llList2Float(parameters,2);
+                alterTransparency (destAlpha, delay);
+            } else if (cmd == "FM:SET") {
+                currentTransparency = destAlpha;
+            }
+        }
+    }
+
+    /*touch_start(integer num_detected) {
+        debug ("touched");
+         llMessageLinked(LINK_THIS, 0, "FM:SET 0", K_ID_MESSAGELINK_FMPROTOCOL);
+         llMessageLinked(LINK_THIS, 0, "FM:ALTER 100 3", K_ID_MESSAGELINK_FMPROTOCOL);
+    }*/
+
+    timer(){
+        if (transformation == K_TRANSFORM_TRANSPARENCY) {
+            updateTransparency();
+        }
+    }
+
+    on_rez(integer start_param) {
+        // Redémarre le script à chaque fois que l’objet est rez
+        llResetScript();
+    }
+}

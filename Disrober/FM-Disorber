@@ -1,0 +1,78 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Lady Green Forensic Component     : DANCEHUD - DISROBER
+//
+//  Signature                         : LGF/APPS/DANCEHUD/DISROBER
+//  Component version                 : 1.0.0
+//  release date                      : August 2023
+//
+//  Description : This component allows to change the outfit of a dancer
+//
+//  States description :
+//      default: default state. 
+//
+//  copyright © Lady Green Forensic 2021
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3
+//  (https://www.gnu.org/licenses/gpl-3.0.html)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+string K_ID_MESSAGELINK_FMPROTOCOL="FMPROTOCOL";
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+addOutfit (string outfit) {
+    debug ("add outfit "+ outfit);
+    llOwnerSay("@attach:Outfits/"+outfit);
+}
+
+removeOutfit (string outfit) {
+    debug ("remove outfit "+ outfit);
+    llOwnerSay("@detach:Outfits/"+outfit+"=force");
+}
+
+
+default {
+
+    link_message(integer source, integer num, string str, key id) {
+        if((string)id == K_ID_MESSAGELINK_FMPROTOCOL) {
+            list parameters = llParseString2List(str, [" "],[]);
+            string cmd = llList2String(parameters,0);
+            string outfit = llList2String(parameters,1);
+            debug ("Received message : " + str);
+            if (cmd == "FM:ADDOUTFIT") {
+                addOutfit(outfit);
+            } else if (cmd == "FM:REMOVEOUTFIT") {
+                removeOutfit(outfit);
+            }
+        }
+    }
+
+    on_rez(integer start_param) {
+        // Redémarre le script à chaque fois que l’objet est rez
+        llResetScript();
+    }
+
+    touch_start( integer num ){
+        debug ("touch");
+        llOwnerSay("@detach:Outfits/aaa=force");
+    }
+}

@@ -1,0 +1,66 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Lady Green Forensic Component     : FULLMONTY - STORYTELLER
+//
+//  Signature                         : LGF/APPS/FULLMONTY/STORYTELLER
+//  Component version                 : 1.0.0
+//  release date                      : August 2024
+//
+//  Description : This component displays ims in local chat based under the control of a
+//                FM Orchestrator
+//
+//  States description :
+//      default: default state.
+//
+//  copyright © Lady Green Forensic 2024
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3
+//  (https://www.gnu.org/licenses/gpl-3.0.html)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+string K_ID_MESSAGELINK_FMPROTOCOL="FMPROTOCOL";
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+default
+{
+    state_entry() {
+    }
+
+    link_message(integer source, integer num, string str, key id) {
+        if((string)id == K_ID_MESSAGELINK_FMPROTOCOL) {
+            list parameters = llParseString2List(str, ["\""],[]);
+            string cmd = llStringTrim(llList2String(parameters,0), STRING_TRIM);
+            string msg = llStringTrim(llList2String(parameters,1), STRING_TRIM);
+            debug ("Received message : " + str);
+            if (cmd == "FM:MSG") {
+                llSay (PUBLIC_CHANNEL, msg);
+            }
+        }
+    }
+
+    on_rez(integer start_param) {
+        // Redémarre le script à chaque fois que l’objet est rez
+        llResetScript();
+    }
+}

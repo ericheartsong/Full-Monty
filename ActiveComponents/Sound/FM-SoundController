@@ -1,0 +1,82 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Lady Green Forensic Component     : FULL MONTY - SOUND
+//
+//  Signature                         : LGF/APPS/FM/SOUND
+//  Component version                 : 1.0.0
+//  release date                      : June 2024
+//
+//  Description : This component plays a sound
+//
+//  States description :
+//      default: default state.
+//
+//  copyright © Lady Green Forensic 2024
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3
+//  (https://www.gnu.org/licenses/gpl-3.0.html)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+string K_ID_MESSAGELINK_FMPROTOCOL="FMPROTOCOL";
+string K_CALLBACK_HANDSHAKE = "FM:HANDSHAKE_CALLBACK";
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+PreloadSound() {
+    llOwnerSay ("Preloadind sounds");
+    integer count = llGetInventoryNumber(INVENTORY_SOUND);
+    string  itemName;
+    while (count--) {
+        itemName = llGetInventoryName(INVENTORY_SOUND, count);
+        llPreloadSound(itemName);
+    }
+}
+
+default
+{
+    state_entry() {
+        // Redémarre le script à chaque fois que l’objet est rez
+        PreloadSound();
+    }
+
+    link_message(integer source, integer num, string str, key id) {
+        debug ("received message : "+ str);
+        if((string)id == K_ID_MESSAGELINK_FMPROTOCOL) {
+            list parameters = llParseString2List(str, [" "],[]);
+            string cmd = llStringTrim(llList2String(parameters,0), STRING_TRIM);
+            string sound =  llStringTrim(llList2String(parameters,1), STRING_TRIM);
+            float volume =  llList2Float(parameters,2);
+            if (cmd == "FM:PLAY_SOUND") {
+                llPlaySound (sound, volume);
+            } else if (cmd == K_CALLBACK_HANDSHAKE) {
+                PreloadSound();
+            }
+        }
+    }
+
+    on_rez(integer start_param) {
+        // Redémarre le script à chaque fois que l’objet est rez
+        llResetScript();
+    }
+}
+
+

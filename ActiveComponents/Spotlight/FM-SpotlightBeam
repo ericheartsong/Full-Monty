@@ -1,0 +1,76 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Lady Green Forensic Component     : FULL MONTY - SPOTLIGHT BEAM
+//
+//  Signature                         : LGF/APPS/FULLMONTY/SPOTLIGHTBEAM
+//  Component version                 : 1.0.0
+//  release date                      : August 2023
+//
+//  Description : This component controls a spotlight beam. It allows the beam
+//                  to show or hide when the target appears or disappears
+//
+//  States description :
+//      default: default state.
+//
+//  copyright © Lady Green Forensic 2023
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the creative commons Attribution- ShareAlike 4.0
+//  International licence. (http://creativecommons.org/licenses/by-sa/4.0/legalcode)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+string K_ID_MESSAGELINK_FMPROTOCOL="FMPROTOCOL";
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+default
+{
+    state_entry() {
+        llSetAlpha(0,ALL_SIDES);
+    }
+
+    link_message(integer source, integer num, string str, key id) {
+        if((string)id == K_ID_MESSAGELINK_FMPROTOCOL) {
+            list parameters = llParseString2List(str, [" "],[]);
+            string cmd = llList2String(parameters,0);
+            string color = llList2String(parameters,1);
+            debug ("color = " + (string) color);
+            debug ("cmd = " + cmd);
+            debug ("Received message : " + str);
+            if (cmd == "FM:BEAM_ON" || cmd == "FM:LIGHT_ON") {
+                llSetLinkAlpha(LINK_THIS, 0.04,ALL_SIDES);
+            } else if (cmd == "FM:BEAM_OFF" || cmd == "FM:LIGHT_OFF") {
+                llSetLinkAlpha(LINK_THIS,0,ALL_SIDES);
+            } else if (cmd=="FM:BEAM_COLOR") {
+                llSetLinkColor(LINK_THIS,(vector)color,ALL_SIDES );
+            } else if (cmd=="FM:BEAM_TRANSPARENCY") {
+                llSetLinkAlpha(LINK_THIS, (float)color,ALL_SIDES);
+            }
+        }
+    }
+
+    on_rez(integer start_param) {
+        // Redémarre le script à chaque fois que l’objet est rez
+        llSetLinkAlpha(LINK_THIS, 0,ALL_SIDES);
+        llResetScript();
+    }
+}

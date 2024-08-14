@@ -1,0 +1,222 @@
+integer handleListen=0;
+integer handleListen2=0;
+integer channel = 0;
+string anim = "";
+string command = "";
+
+move (string depl, string speed) {
+    vector deplvect = (vector)depl;
+    vector deplPerSecond = (deplvect / (float)speed);
+    float initialTime = llGetTime();
+    float elapsedTime = 0;
+    vector currentPos = llGetPos();
+    integer i = 0;
+    while (elapsedTime < (float)speed) {
+        elapsedTime = llGetTime() - initialTime;
+        vector deplThisStep =(vector)(deplPerSecond * elapsedTime);
+
+        if (elapsedTime !=0) {
+            llSetLinkPrimitiveParamsFast(LINK_ROOT, [PRIM_POSITION,deplThisStep+currentPos]);
+        }
+        llSleep(0.05);
+        i=i+1;
+    }
+    vector deplThisStep = (vector)(deplPerSecond * (float)speed);
+    llSetLinkPrimitiveParamsFast(LINK_ROOT, [PRIM_POSITION,deplThisStep+currentPos]);
+}
+
+turn (string rota, string speed) {
+    vector rotatiovect = (vector)rota;
+    vector rotationPerSecond = (rotatiovect * DEG_TO_RAD / (float)speed);
+    float initialTime = llGetTime();
+    float elapsedTime = 0;
+    rotation currentRot = llGetRot();
+    integer i = 0;
+    while (elapsedTime < (float)speed) {
+        elapsedTime = llGetTime() - initialTime;
+        rotation rotationThisStep = llEuler2Rot(rotationPerSecond * elapsedTime);
+
+        if (elapsedTime !=0) {
+            llSetLinkPrimitiveParamsFast(LINK_ROOT, [PRIM_ROTATION,rotationThisStep*currentRot]);
+        }
+        llSleep(0.05);
+        i=i+1;
+    }
+    rotation rotationThisStep = llEuler2Rot(rotationPerSecond * (float)speed);
+    llSetLinkPrimitiveParamsFast(LINK_ROOT, [PRIM_ROTATION,rotationThisStep*currentRot]);
+}
+
+moveav (string depl, string speed) {
+    vector deplvect = (vector)depl;
+    vector deplPerSecond = (deplvect / (float)speed);
+    float initialTime = llGetTime();
+    float elapsedTime = 0;
+    integer i = 0;
+    integer avatarLinkNumber = llGetNumberOfPrims();
+    vector initialPos = llList2Vector(llGetLinkPrimitiveParams(LINK_THIS, [PRIM_POS_LOCAL]), 0);
+    vector posAvatar = llList2Vector(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_POS_LOCAL]), 0);
+    while (elapsedTime < (float)speed) {
+        elapsedTime = llGetTime() - initialTime;
+        vector deplThisStep =(vector)(deplPerSecond * elapsedTime);
+
+        if (elapsedTime !=0) {
+            vector avatarPos = posAvatar + deplThisStep;
+            llSetLinkPrimitiveParamsFast(LINK_THIS,  [PRIM_LINK_TARGET, avatarLinkNumber, PRIM_POS_LOCAL, avatarPos]);
+        }
+        llSleep(0.05);
+        i=i+1;
+    }
+    vector deplThisStep = (vector)(deplPerSecond * (float)speed);
+    vector avatarPos = posAvatar + deplThisStep;
+    llSetLinkPrimitiveParamsFast(LINK_THIS,  [PRIM_LINK_TARGET, avatarLinkNumber, PRIM_POS_LOCAL, avatarPos]);
+    posAvatar = llList2Vector(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_POS_LOCAL]), 0);
+}
+
+turnav (string rota, string speed) {
+    vector rotatiovect = (vector)rota;
+    vector rotationPerSecond = (rotatiovect * DEG_TO_RAD / (float)speed);
+    float initialTime = llGetTime();
+    float elapsedTime = 0;
+    integer i = 0;
+
+    integer avatarLinkNumber = llGetNumberOfPrims();
+    rotation initialRot = llList2Rot(llGetLinkPrimitiveParams(LINK_THIS, [PRIM_ROT_LOCAL]), 0);
+    rotation rotAvatar = llList2Rot(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_ROT_LOCAL]), 0);
+    while (elapsedTime < (float)speed) {
+        elapsedTime = llGetTime() - initialTime;
+        rotation rotationThisStep = llEuler2Rot(rotationPerSecond * elapsedTime);
+
+        if (elapsedTime !=0) {
+            //llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_ROTATION,rotationThisStep*currentRot]);
+            rotation rotTotal = rotationThisStep*initialRot;
+            rotation avatarRot = rotationThisStep* rotAvatar;
+            llSetLinkPrimitiveParamsFast(LINK_THIS,  [PRIM_LINK_TARGET, avatarLinkNumber, PRIM_ROT_LOCAL, avatarRot]);
+        }
+        llSleep(0.05);
+        i=i+1;
+    }
+    rotation rotationThisStep = llEuler2Rot(rotationPerSecond * (float)speed);
+    rotation rotTotal = rotationThisStep*initialRot;
+    rotation avatarRot = rotationThisStep* rotAvatar;
+    llSetLinkPrimitiveParamsFast(LINK_THIS,  [PRIM_LINK_TARGET, avatarLinkNumber, PRIM_ROT_LOCAL, avatarRot]);
+}
+
+playAnim(string anim){
+    llStartAnimation(anim);
+}
+
+stopAnim(string anim){
+    llStopAnimation(anim);
+}
+
+dump() {
+    integer avatarLinkNumber = llGetNumberOfPrims();
+    vector posAvatar = llList2Vector(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_POS_LOCAL]), 0);
+    llOwnerSay("local position of avatar on poseball :" + (string) posAvatar);
+
+    vector posLocal = llList2Vector(llGetLinkPrimitiveParams(LINK_THIS, [PRIM_POSITION]), 0);
+    llOwnerSay("Position of poseball :" + (string) posLocal);
+
+    rotation rotAvatar = llList2Rot(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_ROT_LOCAL]), 0);
+    llOwnerSay("local rotation of avatar on poseball :" + (string) (llRot2Euler(rotAvatar)*RAD_TO_DEG));
+
+    rotation rotLocal = llList2Rot(llGetLinkPrimitiveParams(LINK_THIS, [PRIM_ROTATION]), 0);
+    llOwnerSay("Rotation of poseball :" + (string) (llRot2Euler(rotLocal)*RAD_TO_DEG));
+}
+
+string concat (list l, integer i) {
+    list temp= llList2List(l, i, llGetListLength(l));
+    integer nbItems = llGetListLength(temp);
+    string returnValue = "";
+    if (nbItems > 1) {
+        returnValue = llDumpList2String (temp, " ");
+    } else {
+        returnValue =  llList2String (temp, 0);
+    }
+
+    return returnValue;
+}
+
+string getVector (string axis, string value) {
+    string returnValue = "";
+    if (axis == "x") {
+        returnValue = "<"+value+",0,0>";
+    } else if (axis == "y") {
+        returnValue = "<0,"+value+",0>";
+    } else if (axis == "z") {
+        returnValue = "<0,0,"+value+">";
+    }
+
+    return returnValue;
+}
+
+default
+{
+    state_entry()   {
+        llSitTarget(<0,0.0,0.1>,llEuler2Rot(<0,0,0>*DEG_TO_RAD));
+        channel = (integer) llGetObjectDesc() ;
+        handleListen = llListen(channel, "","","");
+        handleListen2 = llListen(0, "","","play");
+    }
+
+    run_time_permissions(integer perm) {
+        if (perm & PERMISSION_TRIGGER_ANIMATION)
+        {
+            llStopAnimation("sit_generic");
+            llStopAnimation("sit");
+            llStartAnimation("POSEMANIACS-3MaleBreathing3");
+        }
+    }
+
+    changed(integer change) {
+        if (change & CHANGED_LINK)
+        {
+            key avatar = llAvatarOnSitTarget();
+            if (llKey2Name(avatar) != "")
+            {
+                llRequestPermissions(avatar, PERMISSION_TRIGGER_ANIMATION);
+            }
+        }
+        if (change & CHANGED_OWNER + CHANGED_REGION_START + CHANGED_INVENTORY)
+        {
+            llResetScript();
+        }
+    }
+
+    listen(integer chann, string name, key id, string message) {
+
+        if (chann == channel) {
+            list parameters = llParseString2List(message, [" "], []);
+            string cmd = llToLower(llList2String(parameters, 0));
+            string vect = llList2String(parameters, 1);
+            string speed = llList2String(parameters, 2);
+
+
+            if (vect != "") {
+                if (cmd == "fm:turn") {
+                    turn (vect, speed);
+                } else if (cmd == "fm:turnav") {
+                    turnav (vect, speed);
+                } else if (cmd == "fm:move") {
+                    move (vect, speed);
+                } else if (cmd == "fm:moveav") {
+                    moveav (vect, speed);
+                } else if (cmd == "fm:play") {
+                    anim = concat(parameters, 1);
+                    command = cmd;
+                }  else if (cmd == "fm:play_stop") {
+                    anim = concat(parameters, 1);
+                    command = cmd;
+                }
+            }
+        } else if (chann == 0) {
+            if (command == "fm:play") {
+                playAnim(anim);
+            } else if (command == "fm:play_stop") {
+                stopAnim(anim);
+            }
+        }
+    }
+
+
+}

@@ -1,0 +1,96 @@
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "0.2.0"; // version of the component
+
+vector COLOR_WHITE = <1.0, 1.0, 1.0>;
+float  OPAQUE      = 1.0;
+
+string K_HEADER_MSG_HANDSHAKE = "FM:MC_HANDSHAKE";
+integer HANDSHAKE_CHANNEL = -10731;
+integer HANDSHAKE_CHANNEL_RESPONSE = -10732;
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 1;
+integer listenHandle = 0; // Handle of the listen for the handshake
+string currentName="";
+string msgReceivedFromDisplay;
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+////////////////////////////////////
+// Error function
+////////////////////////////////////
+error (string errorCode, string pLog) {
+    llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + errorCode + ":  " + pLog);
+}
+
+
+updateTitle() {
+    llSetText(llGetObjectDesc(), COLOR_WHITE, OPAQUE);
+}
+
+sendPosition(string msg) {
+    msgReceivedFromDisplay = msg;
+    list data = llParseString2List(msg, ["|"],[]);
+    currentName = llList2String(data,0);
+    vector pos = llGetPos();
+    string msg = "REGISTER" + "|" + msg +"|" + (string)pos;
+    debug("sending position : " + msg);
+    llRegionSay(HANDSHAKE_CHANNEL_RESPONSE, msg);
+
+}
+unregister() {
+
+    string msg = "UNREGISTER" + "|" + currentName;
+    debug("sending position : " + msg);
+    llRegionSay(HANDSHAKE_CHANNEL_RESPONSE, msg);
+}
+
+string getMessageToSend() {
+    return msgReceivedFromDisplay;
+}
+
+////////////////////////////////////
+// Main
+////////////////////////////////////
+default
+{
+    state_entry() {
+        listenHandle = llListen(HANDSHAKE_CHANNEL, "", "", "");
+        sendPosition(getMessageToSend());
+    }
+
+    listen( integer channel, string name, key id, string message ) {
+        if ((channel == HANDSHAKE_CHANNEL) && (message==K_HEADER_MSG_HANDSHAKE)) {
+            sendPosition(getMessageToSend());
+        }
+    }
+
+    link_message(integer sender_num, integer num, string msg, key id) {
+        if ((string)id == "REFRESH") {
+            unregister();
+            sendPosition(msg);
+        }
+    }
+
+    touch_start(integer total_number) {
+        updateTitle();
+    }
+
+    on_rez(integer start_param) {
+        llResetScript();
+    }
+
+}
+
+

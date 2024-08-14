@@ -6,24 +6,20 @@
 //  Component version                 : 1.0.0
 //  release date                      : August 2023
 //
-//  Description : This component is the soul catcher of BYOS SYSTEM.
-//                This script stores various data  (mainly souls).
-//
-//                It also acts as a provider of parameters for all BYOS
-//                components.
+//  Description : This component is the config serer of Full Monty System
+//                It allows FM scripts to get some parameters to run
+
 //
 //  States description :
 //      default:
 //          current state when object is rezzed. Reading the nc
-//      running:
-//          when the script is ready to de
 //
 //
 //  copyright © Lady Green Forensic 2023
 //
 //  This script is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License, version 3 
-//  (https://www.gnu.org/licenses/gpl-3.0.html)lcode)
+//  it under the terms of the GNU General Public License, version 3
+//  (https://www.gnu.org/licenses/gpl-3.0.html)
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,29 +61,29 @@ debug (string pLog) {
 ****************************************************************/
 initNotecard(){
 
-  // clean all values
-  index = 0;
-  ncLines = 0;
-  parameters = [];
+    // clean all values
+    index = 0;
+    ncLines = 0;
+    parameters = [];
 
-  debug ("Loading config notecard "+ K_NOTECARD_PARAMETERS);
-  ncQueryId = llGetNotecardLine(K_NOTECARD_PARAMETERS,ncLines);
+    debug ("Loading config notecard "+ K_NOTECARD_PARAMETERS);
+    ncQueryId = llGetNotecardLine(K_NOTECARD_PARAMETERS,ncLines);
 }
 
 /***************************************************************
 ** Read one line of the parameters notecard to load
 ****************************************************************/
 readnotecardLine(string lineCard) {
-  // do not modify the line
-  parameters += lineCard;
-  debug ("storing paraneter : " + lineCard);
+    // do not modify the line
+    parameters += lineCard;
+    debug ("storing paraneter : " + lineCard);
 }
 
 sendConfig() {
     integer i = 0;
     integer lines = llGetListLength(parameters);
     string msg = "";
-    
+
     for (;i<lines; i++) {
         string buffer = llList2String(parameters, i);
         list paramValue = llParseString2List(buffer, ["=", " "], []);
@@ -101,37 +97,37 @@ sendConfig() {
 // default state
 ////////////////////////////////////
 default{
-  state_entry() {
-    debug ("Reading config files");
+    state_entry() {
+        debug ("Reading config files");
 
-    // Init config nc loading
-    initNotecard();
-  }
-
-  dataserver(key queryId, string data) {
-    // Process the card lines
-    if(queryId == ncQueryId) {
-      if(data != EOF) {
-          readnotecardLine(data);
-          ncQueryId = llGetNotecardLine(K_NOTECARD_PARAMETERS,++ncLines);
-      } else {
-        // notecard is loaded. Initialize storage and wait for requests.
-        sendConfig();
-        //llSetScriptState(llGetScriptName(),FALSE);
-      }
+        // Init config nc loading
+        initNotecard();
     }
-  }
-  
-      
-  link_message(integer Sender, integer Number, string String, key Key) {
-      
-      if ((string)Key == K_ID_MESSAGELINK_CONFIG_TO) {
-        if (String == K_MSG_SEND_CONFIG) {
-            sendConfig();
+
+    dataserver(key queryId, string data) {
+        // Process the card lines
+        if(queryId == ncQueryId) {
+            if(data != EOF) {
+                readnotecardLine(data);
+                ncQueryId = llGetNotecardLine(K_NOTECARD_PARAMETERS,++ncLines);
+            } else {
+                // notecard is loaded. Initialize storage and wait for requests.
+                sendConfig();
+                //llSetScriptState(llGetScriptName(),FALSE);
+            }
         }
-      }
-  }
-  
+    }
+
+
+    link_message(integer Sender, integer Number, string String, key Key) {
+
+        if ((string)Key == K_ID_MESSAGELINK_CONFIG_TO) {
+            if (String == K_MSG_SEND_CONFIG) {
+                sendConfig();
+            }
+        }
+    }
+
 }
 
 

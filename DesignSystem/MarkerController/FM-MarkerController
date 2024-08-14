@@ -1,0 +1,194 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//  Lady Green Forensic Component     : FULLMONTY - INTEGRATOR
+//
+//  Signature                         : LGF/APPS/FULLMONTY/MARKERCONTROLLER
+//  Component version                 : 0.2.0
+//  release date                      : August 2023
+//
+//  Description : This component allow some interactions between the FM
+//                orchestrator and all other components executing commands defined
+//                in a choreography.
+//
+//
+//  copyright © Lady Green Forensic 2023
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3
+//  (https://www.gnu.org/licenses/gpl-3.0.html)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "0.2.0"; // version of the component
+
+string K_ID_MESSAGELINK_MARKER_CONTROLLER = "MARKER CONTROLLER";
+integer K_MSG_MARKER_CONTROLLER_REGISTER = 1;
+integer K_MSG_MARKER_CONTROLLER_HANDSHAKE = 2;
+integer K_MSG_MARKER_CONTROLLER_RESET = 3;
+integer K_MSG_MARKER_CONTROLLER_SEND = 4;
+float K_MAX_HANDSHAKE_SEC = 20.0;
+integer HANDSHAKE_CHANNEL = -10731;
+integer HANDSHAKE_CHANNEL_RESPONSE = -10732;
+
+string K_ERR_MARKER_CONTROLLER_001 = "ERR_MARKER_CONTROLLER_001 : Invalid component registration";
+
+string K_HEADER_MSG_HANDSHAKE = "FM:MC_HANDSHAKE";
+
+vector COLOR_WHITE = <1.0, 1.0, 1.0>;
+float  OPAQUE      = 1.0;
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 1;
+list markers = []; // list of markers alphabetically sorted
+key initiatorId = NULL_KEY; // person who sent an handshake or a validate component process
+integer listenHandle = 0; // Handle of the listen for the handshake
+
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+    if (debugMode == 1) {
+        llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+    }
+}
+
+////////////////////////////////////
+// Error function
+////////////////////////////////////
+error (string errorCode, string pLog) {
+    llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + errorCode + ":  " + pLog);
+}
+
+
+////////////////////////////////////
+// Register component integrated with orchestrator
+////////////////////////////////////
+registerComponent (string name, key id, vector pos) {
+    debug ("Register component : name=" + name + ", id=" + (string)id + ", pos=" + "-" + (string)pos);
+
+    // check if the name is still existing
+    integer index = llListFindList(markers, []+name);
+    if  (index== -1) {
+        // not found. We add it
+        markers += name;
+        markers +=id;
+        markers +=pos;
+    } else {
+        key uuid = llList2Key(markers, index+1);
+        if (uuid != id) {
+            // same markers with different ids. Do not register
+            llSay(PUBLIC_CHANNEL, "Duplicate FM Marker name: " + name + ".Registration failed");
+        } else {
+            // we remove the marker from the list
+            markers = llDeleteSubList(markers, index, index+2);
+        }
+    }
+    markers = llListSort(markers, 3, TRUE);
+    debug ("Markers= " + (string) markers);
+}
+
+////////////////////////////////////
+// unRegister component integrated with orchestrator
+////////////////////////////////////
+unRegisterComponent (string name, key id) {
+    // check if the name is still existing
+    integer index = llListFindList(markers, []+name);
+    if (index!=-1) {
+        // we remove the marker from the list
+        markers = llDeleteSubList(markers, index, index+2);
+    }
+}
+
+////////////////////////////////////
+// Execute the handshake components
+////////////////////////////////////
+handshake() {
+    llRegionSay((integer) HANDSHAKE_CHANNEL, K_HEADER_MSG_HANDSHAKE);
+    debug ("Send a handshake message on channel " + (string)HANDSHAKE_CHANNEL);
+}
+
+////////////////////////////////////
+// compute a shift
+////////////////////////////////////
+vector computeShift(vector src, vector dest) {
+    vector result;
+
+    result.x = dest.x - src.x;
+    result.y = dest.y - src.y;
+    result.z = dest.z - src.z;
+
+    return result;
+}
+
+////////////////////////////////////
+// Generate the commands
+////////////////////////////////////
+generateCmd() {
+    integer listLength = llGetListLength(markers);
+    integer index =0;
+    vector previousPos = ZERO_VECTOR;
+
+    llSay(PUBLIC_CHANNEL, "---------- Start of code generation ----------" );
+    string chrono = llList2String(markers, index);
+    previousPos = llList2Vector(markers, index+2);
+    llSay(PUBLIC_CHANNEL,  chrono + ":");
+    for (index=3; index < listLength; index=index+3) {
+        chrono = llList2String(markers, index);
+        vector pos = llList2Vector(markers, index+2);
+        llSay(PUBLIC_CHANNEL,  chrono + ":");
+        vector vectorShift = computeShift (previousPos, pos);
+        llSay(PUBLIC_CHANNEL, "SEND DancerX {FM:MOVE "+ (string)vectorShift +" yourDuration}");
+    }
+    llSay(PUBLIC_CHANNEL, "---------- End of code generation ----------" );
+}
+
+updateTitle() {
+    llSetText(llGetObjectDesc(), COLOR_WHITE, OPAQUE);
+
+    llMessageLinked(LINK_ALL_OTHERS, 0, "REFRESH", NULL_KEY);
+}
+
+////////////////////////////////////
+// Main
+////////////////////////////////////
+default
+{
+    state_entry() {
+        listenHandle = llListen(HANDSHAKE_CHANNEL_RESPONSE, "", "", "");
+        handshake();
+        updateTitle();
+    }
+
+    listen( integer channel, string name, key id, string message ) {
+        if (channel == HANDSHAKE_CHANNEL_RESPONSE) {
+            list response = llParseString2List(message, ["|"],[]);
+            string command = llList2String(response,0);
+            string markerName = llList2String(response,1);
+            if (command = "REGISTER") {
+                vector markerPos = (vector)llList2String(response,2);
+                debug ("pos=" + (string)markerPos);
+                debug ("postring=" +  llList2String(response,2));
+                registerComponent(markerName, id, markerPos);
+            } else {
+                unRegisterComponent(markerName, id);
+            }
+
+        }
+    }
+
+    touch_start(integer total_number) {
+        generateCmd();
+    }
+
+    on_rez(integer start_param) {
+        llResetScript();
+    }
+
+}
+
