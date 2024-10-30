@@ -1,0 +1,527 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//  Lady Green Forensic Component     : FULLMONTY - MOVER
+//
+//  Signature                         : LGF/APPS/FULLMONTY/MOVER
+//  LGF Version protocol              : 0.2.0
+//  Component version                 : 0.1
+//  release date                      : August 2023
+//
+//  Description : This component is the main script for a MOVER of the FULLMONTY system
+//                This script allows to animate the sitter based on FULLMONTY
+//                  MASTER prim
+//
+//  States description :
+//      default:
+//          current state when object is rezzed. Not initialized
+//      running:
+//          Poseball is ready to receive messages from FULLMONTY MASTER
+//
+//  copyright © Lady Green Forensic 2021
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the creative commons Attribution- ShareAlike 4.0
+//  International licence. (http://creativecommons.org/licenses/by-sa/4.0/legalcode)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "0.0.2.1"; // version of the component
+
+string K_DEFAULT_ANIM = "POSEMANIACS-2MaleBreathing7";
+
+
+////////////////////////////////////
+// Message
+////////////////////////////////////
+string K_ID_MESSAGELINK_FMPROTOCOL="FMPROTOCOL";
+string K_INIT_POSEBALL = "POSEBALL_INITIALIZED";
+string K_POSEBALL_ACK = "POSEBALL_INITIALIZED_ACK";
+string K_MOVER_ANIMATION_START = "FM:PLAY";
+string K_MOVER_ANIMATION_STOP = "FM:PLAY_STOP";
+string K_MOVER_ROTATION = "FM:TURN";
+string K_MOVER_MOVE = "FM:MOVE";
+string K_MOVER_ROTATIONAV = "FM:TURNAV";
+string K_MOVER_MOVEAV = "FM:MOVEAV";
+string K_MOVER_DUMP = "FR:DUMP";
+string K_MOVER_REHEARSAL_MODE = "FM:REHEARSAL_MODE";
+string K_MOVER_SHOW_MODE = "FM:SHOW_MODE";
+string K_MOVER_REHEARSAL_PLAY = "FR:PLAY";
+string K_MOVER_REHEARSAL_PLAY_STOP= "FR:PLAY_STOP";
+string K_MSG_POSEBALL_DEBUGON = "POSEBALL_DEBUGON";
+string K_MSG_POSEBALL_DEBUGOFF = "POSEBALL_DEBUGOFF";
+string K_MSG_MOVER_DIE = "FM:DIE";
+string K_MSG_POSEBALL_DEFAULT_POSE = "POSEBALL_DEFAULT_POSE";
+
+// Configuration
+integer K_CHANNEL_CONFIG = 9;
+string K_MSG_SEND_CONFIG = "SEND_CONFIG";
+string K_ID_MESSAGELINK_CONFIG_TO= "CONFIGURATION_TO";
+string K_ID_MESSAGELINK_CONFIG_FROM= "CONFIGURATION_FROM";
+integer K_MODE_REHEARSAL = 1;
+integer K_MODE_SHOW = 0;
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+integer debugMode = 0;
+integer channelPoseball = 0;
+integer handleListenPoseball =0;
+integer modeMover = 0 ; // 0 = show, 1= rehearsal
+string poseballName;
+key fullMontyMasterKey = NULL_KEY;
+string poseToSit = "sit";
+string offSetAvatar = "<0,0,0>";
+string rotationAvatar = "<0,0,0>";
+integer hidePrim = 1;
+float timeMarker = 0.0;
+////////////////////////////////////
+// log function
+////////////////////////////////////
+debug (string pLog) {
+  if (debugMode == 1) {
+    llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+  }
+}
+
+debugLevel (string pLog, integer level) {
+  if (debugMode >= 2) {
+    llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + pLog);
+  }
+}
+
+show(string title){
+  llSetPrimitiveParams([PRIM_TEXT,title,<0.9,0.6,0.2>,1.0, PRIM_COLOR, ALL_SIDES,<1,1,1>,1.0]);
+  debug ("Sit target = " + offSetAvatar + " / " + rotationAvatar);
+  vector rotatiovect = ((vector)rotationAvatar* DEG_TO_RAD);
+  rotation rot = llEuler2Rot(rotatiovect);
+  llSitTarget((vector)offSetAvatar, rot);
+  llSetClickAction(CLICK_ACTION_SIT);
+}
+
+hide() {
+    if(hidePrim == 1) {
+        llSetPrimitiveParams([PRIM_TEXT,"",ZERO_VECTOR,0.0, PRIM_COLOR, ALL_SIDES,ZERO_VECTOR,0.0]);
+    } else {
+        llSetPrimitiveParams([PRIM_TEXT,"",ZERO_VECTOR,0.0]);
+    }
+}
+
+initializeListenPoseball(integer channel) {
+  if (channel != 0) {
+    handleListenPoseball = llListen(channel, "","","");
+    channelPoseball = channel;
+    getConfig();
+    debug ("poseball initialized with channel " + (string)channel);
+    // broadcast message to fullMonty Master
+    llRegionSay(channelPoseball+1, K_INIT_POSEBALL);
+  } else {
+    llOwnerSay("Warning: Poseball run in standalone mode. Not attached to a FullMonty Master");
+  }
+}
+
+playAnim(string anim, integer rehearsalMode){   
+    debug ("Playing animation " + anim);
+    llStartAnimation(anim);
+    if ((rehearsalMode==1) && (modeMover == K_MODE_REHEARSAL)) {
+       timeMarker = llGetTime(); 
+    }
+}
+
+stopAnim(string anim,  integer rehearsalMode){
+    debug ("Stop animation " + anim);
+    llStopAnimation(anim);
+    if (modeMover == K_MODE_REHEARSAL) {
+        rehearseDelay("Stop animation. Delay since last rehearhal play animation: ", anim, rehearsalMode);
+    }
+}
+
+rehearseDelay(string prefix, string anim, integer rehearsalMode) {
+    if (rehearsalMode==1) {
+        float time = llGetTime();
+        float delay = computeDelay(time, timeMarker);
+        llOwnerSay(prefix + anim + " "+ (string) delay);
+    }
+}
+
+float computeDelay (float T1, float T2) {
+    return (float)(T2 - T1);
+}
+
+move (string depl, string speed) {
+  debug ("depl " + depl);
+  
+  debug ("move with speed = " + (string) speed);
+  vector deplvect = (vector)depl;
+  vector deplPerSecond = (deplvect / (float)speed);
+  float initialTime = llGetTime();
+  float elapsedTime = 0;
+  vector currentPos = llGetPos();
+  debug ("initial Time = " + (string) initialTime);
+  integer i = 0;
+  while (elapsedTime < (float)speed) {
+    elapsedTime = llGetTime() - initialTime;
+    vector deplThisStep =(vector)(deplPerSecond * elapsedTime);
+          
+    if (elapsedTime !=0) {
+      llSetLinkPrimitiveParamsFast(LINK_ROOT, [PRIM_POSITION,deplThisStep+currentPos]);
+    }
+    llSleep(0.05);
+    i=i+1;
+  }
+  vector deplThisStep = (vector)(deplPerSecond * (float)speed);
+  llSetLinkPrimitiveParamsFast(LINK_ROOT, [PRIM_POSITION,deplThisStep+currentPos]);  
+  debug ("final Time = " + (string)  llGetTime());
+  debug ("number of steps = " + (string)  i);
+}
+
+turn (string rota, string speed) {
+  debug ("Rotation " + rota);
+  
+  debug ("rotation with speed = " + (string) speed);
+  vector rotatiovect = (vector)rota;
+  vector rotationPerSecond = (rotatiovect * DEG_TO_RAD / (float)speed);
+  float initialTime = llGetTime();
+  float elapsedTime = 0;
+  rotation currentRot = llGetRot();
+  debug ("initial Time = " + (string) initialTime);
+  integer i = 0;
+  while (elapsedTime < (float)speed) {
+    elapsedTime = llGetTime() - initialTime;
+    rotation rotationThisStep = llEuler2Rot(rotationPerSecond * elapsedTime);
+          
+    if (elapsedTime !=0) {
+      llSetLinkPrimitiveParamsFast(LINK_ROOT, [PRIM_ROTATION,rotationThisStep*currentRot]);
+    }
+    llSleep(0.05);
+    i=i+1;
+  }
+  rotation rotationThisStep = llEuler2Rot(rotationPerSecond * (float)speed);
+  llSetLinkPrimitiveParamsFast(LINK_ROOT, [PRIM_ROTATION,rotationThisStep*currentRot]);  
+  debug ("final Time = " + (string)  llGetTime());
+  debug ("number of steps = " + (string)  i);
+}
+
+initRunningState () {
+  //handleListenPoseball = llListen(channelPoseball, "",fullMontyMasterKey,"");
+}
+
+moveav (string depl, string speed) {
+  debug ("depl " + depl);
+  
+  debug ("move with speed = " + (string) speed);
+  vector deplvect = (vector)depl;
+  vector deplPerSecond = (deplvect / (float)speed);
+  float initialTime = llGetTime();
+  float elapsedTime = 0;
+  debug ("initial Time = " + (string) initialTime);
+  integer i = 0;
+  integer avatarLinkNumber = llGetNumberOfPrims();
+  vector initialPos = llList2Vector(llGetLinkPrimitiveParams(LINK_THIS, [PRIM_POS_LOCAL]), 0);
+  vector posAvatar = llList2Vector(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_POS_LOCAL]), 0);
+  debugLevel("posAvatar avant MoveAV =" + (string) posAvatar, 2);
+  while (elapsedTime < (float)speed) {
+    elapsedTime = llGetTime() - initialTime;
+    vector deplThisStep =(vector)(deplPerSecond * elapsedTime);
+          
+    if (elapsedTime !=0) {
+      vector avatarPos = posAvatar + deplThisStep;
+      llSetLinkPrimitiveParamsFast(LINK_THIS,  [PRIM_LINK_TARGET, avatarLinkNumber, PRIM_POS_LOCAL, avatarPos]);
+    }
+    llSleep(0.05);
+    i=i+1;
+  }
+  vector deplThisStep = (vector)(deplPerSecond * (float)speed);
+  vector avatarPos = posAvatar + deplThisStep;
+  llSetLinkPrimitiveParamsFast(LINK_THIS,  [PRIM_LINK_TARGET, avatarLinkNumber, PRIM_POS_LOCAL, avatarPos]);
+  debug ("final Time = " + (string)  llGetTime());
+  debug ("number of steps = " + (string)  i);
+  posAvatar = llList2Vector(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_POS_LOCAL]), 0);
+  debugLevel("posAvatar après MoveAV =" + (string) posAvatar, 2);
+}
+
+turnav (string rota, string speed) {
+  debug ("Enter turnav : rotation " + rota);
+  
+  debug ("rotation with speed = " + (string) speed);
+  vector rotatiovect = (vector)rota;
+  vector rotationPerSecond = (rotatiovect * DEG_TO_RAD / (float)speed);
+  float initialTime = llGetTime();
+  float elapsedTime = 0;
+  debug ("initial Time = " + (string) initialTime);
+  integer i = 0;
+  
+  integer avatarLinkNumber = llGetNumberOfPrims();
+  rotation initialRot = llList2Rot(llGetLinkPrimitiveParams(LINK_THIS, [PRIM_ROT_LOCAL]), 0);
+  rotation rotAvatar = llList2Rot(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_ROT_LOCAL]), 0);
+  while (elapsedTime < (float)speed) {
+    elapsedTime = llGetTime() - initialTime;
+    rotation rotationThisStep = llEuler2Rot(rotationPerSecond * elapsedTime);
+          
+    if (elapsedTime !=0) {
+      //llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_ROTATION,rotationThisStep*currentRot]);
+      rotation rotTotal = rotationThisStep*initialRot;
+      rotation avatarRot = rotationThisStep* rotAvatar;
+      llSetLinkPrimitiveParamsFast(LINK_THIS,  [PRIM_LINK_TARGET, avatarLinkNumber, PRIM_ROT_LOCAL, avatarRot]);
+    }
+    llSleep(0.05);
+    i=i+1;
+  }
+  rotation rotationThisStep = llEuler2Rot(rotationPerSecond * (float)speed);
+  rotation rotTotal = rotationThisStep*initialRot;
+  rotation avatarRot = rotationThisStep* rotAvatar;
+  llSetLinkPrimitiveParamsFast(LINK_THIS,  [PRIM_LINK_TARGET, avatarLinkNumber, PRIM_ROT_LOCAL, avatarRot]);
+  debug ("final Time = " + (string)  llGetTime());
+  debug ("number of steps = " + (string)  i);
+}
+
+dump() {
+    if (modeMover == K_MODE_REHEARSAL) {
+        integer avatarLinkNumber = llGetNumberOfPrims();
+        vector posAvatar = llList2Vector(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_POS_LOCAL]), 0);
+        llOwnerSay("local position of avatar on poseball :" + (string) posAvatar);   
+      
+        vector posLocal = llList2Vector(llGetLinkPrimitiveParams(LINK_THIS, [PRIM_POSITION]), 0);
+        llOwnerSay("Position of poseball :" + (string) posLocal); 
+        
+        rotation rotAvatar = llList2Rot(llGetLinkPrimitiveParams(avatarLinkNumber, [PRIM_ROT_LOCAL]), 0);
+        llOwnerSay("local rotation of avatar on poseball :" + (string) (llRot2Euler(rotAvatar)*RAD_TO_DEG));   
+      
+        rotation rotLocal = llList2Rot(llGetLinkPrimitiveParams(LINK_THIS, [PRIM_ROTATION]), 0);
+        llOwnerSay("Rotation of poseball :" + (string) (llRot2Euler(rotLocal)*RAD_TO_DEG)); 
+        
+        list anims = llGetAnimationList(llAvatarOnSitTarget());         
+        llOwnerSay("list of running animations :" + (string) anims);     
+    }
+}
+
+string getParameter (string name, list parameters) {
+    integer index = llListFindList(parameters, [] + ("Param" + name));
+    debug ("Index getParameter pour " + name + " = " + (string) index);
+    string returnValue = "";
+    if ((index >= 0) && index < (llGetListLength(parameters)-1)) {
+        returnValue = llList2String(parameters, index+1); 
+    }
+    debug ("valeur paramètre pour " + name + " = " + (string) returnValue);
+    return returnValue;
+}
+
+setName(string name) {
+    poseballName =name;
+    llSetObjectDesc(name);
+}
+             
+
+getConfig(){
+    //debug ("Request for configuration");
+    llMessageLinked(LINK_SET, 0, K_MSG_SEND_CONFIG, (key)K_ID_MESSAGELINK_CONFIG_TO);
+}
+
+string concat (list l, integer i) {
+    list temp= llList2List(l, i, llGetListLength(l));
+    integer nbItems = llGetListLength(temp);
+    string returnValue = "";
+    if (nbItems > 1) {
+        returnValue = llDumpList2String (temp, " ");
+    } else {
+        returnValue =  llList2String (temp, 0);   
+    }
+    
+    return returnValue;
+}
+
+////////////////////////////////////
+// States
+////////////////////////////////////
+
+default
+{
+    state_entry() {
+        llSitTarget(<-0.1,0.1,-0.43>,llEuler2Rot(<0,0,0>*DEG_TO_RAD));
+        debug("Enter state default");
+    }
+    
+    run_time_permissions(integer perm)
+    {
+        if (perm & PERMISSION_TRIGGER_ANIMATION)
+        {
+            llStopAnimation("sit_generic");
+            llStopAnimation("sit");
+            debug ("starting animation :" + poseToSit);
+            llStartAnimation(poseToSit);
+            hide();
+            state running;
+        }
+    }
+    
+    changed(integer change)
+    {
+        if (change & CHANGED_LINK)
+        {
+            key avatar = llAvatarOnSitTarget();
+            if (llKey2Name(avatar) != "")
+            {
+                llRequestPermissions(avatar, PERMISSION_TRIGGER_ANIMATION);
+            }
+        }
+        if (change & CHANGED_OWNER + CHANGED_REGION_START + CHANGED_INVENTORY)
+        {
+            llResetScript();
+        }
+    }
+    
+    listen(integer channel, string name, key id, string message) {
+        if (channel == channelPoseball) {
+           debug ("Received a message on channel " + (string)channel + " : " + message + ", id=" + (string)id);
+           list msg = llParseString2List(message, ["|"], []);
+           string cmd = llList2String(msg, 0); 
+           debug ("received cmd : " + cmd);
+           if (cmd == K_POSEBALL_ACK) {
+             debug ("Updating poseball name : " + poseballName);
+             setName ( llList2String(msg, 1));
+             if (llGetListLength (msg)>=3) {
+                poseToSit = llList2String(msg, 2);
+                string offset = llStringTrim(llList2String(msg, 3),STRING_TRIM);
+                if (offset != "") {
+                    offSetAvatar = offset;
+                }
+                string rot = "";
+                if (llGetListLength (msg)>=4) {
+                    rot =  llStringTrim(llList2String(msg, 4),STRING_TRIM);
+                }
+                if (rot != "") {
+                    rotationAvatar = rot;
+                }
+             }
+
+             debug ("poseToSit = " + poseToSit);
+             debug ("offSetAvatar = " + offSetAvatar);
+             debug ("rotationAvatar = " + rotationAvatar);
+             show(poseballName);  
+             llListenRemove(handleListenPoseball);
+             //handleListenPoseball = llListen(channelPoseball, "",id,"");
+             fullMontyMasterKey = id;
+          } else if (cmd == K_MSG_POSEBALL_DEBUGON) {
+            debugMode = 1;
+          } else if (cmd == K_MSG_POSEBALL_DEBUGOFF) {
+            debugMode = 0;    
+          } 
+        } 
+    } 
+    
+    // configuration management
+    link_message(integer sender_num, integer num, string msg, key id) {
+        //debug ("receive a messageLinked: " + msg);
+        if (((string)id == K_ID_MESSAGELINK_CONFIG_FROM) && (num == K_CHANNEL_CONFIG)) {
+            //this is the config sent by the configSrv
+            //debug ("config received");
+            list parameters = llParseString2List(msg, ["|"], []);
+            string value = getParameter("visibility", parameters);
+            if (llToUpper(value) == "TRUE") {
+                hidePrim = 0;
+                //debug ("HidePrim = 0");
+            } else {
+                hidePrim = 1;
+                //debug ("HidePrim = 1");
+            }
+        } else if ((string)id == K_ID_MESSAGELINK_FMPROTOCOL) {
+            //this message has been sent by the FM Protocol
+            list parameters = llParseString2List(msg, [" "], []);
+            string cmd = llList2String(parameters, 0);
+            if (cmd == K_MSG_MOVER_DIE) {
+                llDie();
+            }
+        }
+    }   
+    
+    on_rez(integer start_param) {
+        initializeListenPoseball(start_param);
+    }
+}
+
+state running {
+    state_entry() {
+        debug("Enter state running");
+        initRunningState();
+    }
+    
+    changed(integer change) {
+      if (change & CHANGED_LINK) {
+        key avatar = llAvatarOnSitTarget();
+        if ((llGetPermissions() & PERMISSION_TRIGGER_ANIMATION) && llKey2Name(avatar) != "") {
+          llStopAnimation(K_DEFAULT_ANIM);
+        }
+       llDie();
+      }
+      if (change & CHANGED_OWNER + CHANGED_REGION_START + CHANGED_INVENTORY) {
+            llResetScript();
+      }
+    }
+    
+    link_message(integer sender_num, integer num, string msg, key id) {
+        if ((string)id == K_ID_MESSAGELINK_FMPROTOCOL) {
+            //this message has been sent by the FM Protocol
+            list parameters = llParseString2List(msg, [" "], []);
+            string cmd = llList2String(parameters, 0);
+            if (cmd == K_MSG_MOVER_DIE) {
+                llDie();
+            } else if (cmd==K_MOVER_ANIMATION_START) {
+                playAnim(concat(parameters, 1),0);
+            } else if (cmd==K_MOVER_ANIMATION_STOP) { 
+                stopAnim(concat(parameters, 1),0);
+            }  else if (cmd==K_MOVER_ROTATION) {
+                string rot =  llList2String(parameters, 1); 
+                string speed =  llList2String(parameters, 2); 
+                turn(rot, speed);
+            }  else if (cmd==K_MOVER_ROTATIONAV) {
+                string rot =  llList2String(parameters, 1); 
+                string speed =  llList2String(parameters, 2); 
+                turnav(rot, speed);
+            }  else if (cmd==K_MOVER_MOVE) {
+                string move =  llList2String(parameters, 1); 
+                string speed =  llList2String(parameters, 2); 
+                move(move, speed);
+            }  else if (cmd==K_MOVER_MOVEAV) {
+                string move =  llList2String(parameters, 1); 
+                string speed =  llList2String(parameters, 2); 
+                moveav(move, speed);
+            } else if (cmd==K_MOVER_DUMP) {
+                dump();
+            } else if (cmd==K_MOVER_REHEARSAL_PLAY) {
+                playAnim(concat(parameters, 1), 1);    
+            } else if (cmd==K_MOVER_REHEARSAL_PLAY_STOP) {
+                stopAnim(concat(parameters, 1), 1);    
+            } else if (cmd == K_MOVER_REHEARSAL_MODE) {
+                modeMover = K_MODE_REHEARSAL;
+            } else if (cmd == K_MOVER_SHOW_MODE) {
+                modeMover = K_MODE_SHOW;
+            }
+        }
+    } 
+    
+    listen(integer channel, string name, key id, string message) {
+      debug ("Received a message on channel " + (string)channel + " : " + message + ", id=" + (string)id);
+      if (channel == channelPoseball) {
+        
+        list msg = llParseString2List(message, ["|"], []);
+        string cmd = llList2String(msg, 0); 
+       if (cmd == K_POSEBALL_ACK) {
+          llListenRemove(handleListenPoseball);
+          handleListenPoseball = llListen(channelPoseball, "",id,"");
+        } else if (cmd == K_MSG_POSEBALL_DEBUGON) {
+            debugMode = 1;
+        } else if (cmd == K_MSG_POSEBALL_DEBUGOFF) {
+            debugMode = 0;    
+        }
+      } 
+    }  
+    
+    on_rez(integer start_param) {
+        llOwnerSay("Warning : poseball rezzed in a running state. Not attached to a fullMonty Master.");
+        llResetScript();
+    }
+
+}
