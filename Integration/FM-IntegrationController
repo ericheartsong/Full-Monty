@@ -1,22 +1,22 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Lady Green Forensic Component     : Full Monty - INTEGRATION
+//  Lady Green Forensic Component     : DANCEHUD - SPOTLIGHT INTEGRATION
 //
-//  Signature                         : LGF/APPS/FULLMONTY/INTEGRATION
-//  Component version                 : 1.0.0
+//  Signature                         : LGF/APPS/DANCEHUD/SPOTLIGHT
+//  Component version                 : 0.1
 //  release date                      : August 2023
 //
-//  Description : This component allows the integration of an active
-//                  component with the full monty system
+//  Description : This component allows the integration of the spotlight beam
+//                  with the full monty system
 //
 //  States description :
-//      default: default state. 
+//      default: default state.
 //
-//  copyright © Lady Green Forensic 2024
+//  copyright © Lady Green Forensic 2021
 //
 //  This script is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License, version 3 
-//  (https://www.gnu.org/licenses/gpl-3.0.html)
+//  it under the terms of the creative commons Attribution- ShareAlike 4.0
+//  International licence. (http://creativecommons.org/licenses/by-sa/4.0/legalcode)
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +24,7 @@
 ////////////////////////////////////
 // constants
 ////////////////////////////////////
-string K_Version = "1.0.0"; // version of the component
+string K_Version = "0.1.0"; // version of the component
 
 // Configuration
 integer K_CHANNEL_CONFIG = 9;
@@ -32,13 +32,16 @@ string K_ID_MESSAGELINK_FMPROTOCOL="FMPROTOCOL";
 string K_ID_MESSAGELINK_CONFIG_FROM= "CONFIGURATION_FROM";
 string K_ID_MESSAGELINK_CONFIG_TO= "CONFIGURATION_TO";
 string K_MSG_SEND_CONFIG = "SEND_CONFIG";
-
-// 
+string K_HEADER_MSG_REGISTER_POS_REQUEST = "FM:REGISTER_POSITION_REQUEST";
+string K_HEADER_MSG_REGISTER_POS_RESPONSE = "FM:REGISTER_POSITION_RESPONSE";
+string K_HEADER_MSG_REZZAT_POS_REQUEST = "FM:REZZ_AT_POSITION_REQUEST";
+string K_HEADER_MSG_REZZAT_POS_RESPONSE = "FM:REZZ_AT_POSITION_RESPONSE";
+string K_HEADER_MSG_UNREZZ = "FM:UNREZZ";
+//
 
 // FM Protocol
 integer HANDSHAKE_CHANNEL = -10721;
 string K_HEADER_MSG_HANDSHAKE = "FM:HANDSHAKE";
-string K_CALLBACK_HANDSHAKE = "FM:HANDSHAKE_CALLBACK";
 
 // Errors
 string K_ERR_COMPINTEG_001 = "ERR_COMPINTEG_001 : Orchestrator owner changed during handshake";
@@ -48,7 +51,9 @@ string K_ERR_COMPINTEG_001 = "ERR_COMPINTEG_001 : Orchestrator owner changed dur
 ////////////////////////////////////
 integer debugMode = 0;
 integer channelIntegration  = -1;
+integer channelOrganizer = -1;
 key uuidOrchestrator = NULL_KEY; //identifier of FM orchestrator with who a handshake has been realized
+string showName = "";
 
 ////////////////////////////////////
 // log function
@@ -66,10 +71,39 @@ error (string errorCode, string pLog) {
     llSay(DEBUG_CHANNEL,llGetScriptName()  + ":" + errorCode + ":  " + pLog);
 }
 
+////////////////////////////////////
+// Cmd channel for orchestrator
+////////////////////////////////////
 openChannelCmd (integer channel) {
     debug ("Opening channel " + (string) channel + " for chat cmd and FM integration.");
     llListen (channel, "", NULL_KEY, "");
     channelIntegration = channel;
+}
+
+////////////////////////////////////
+// Cmd channel for organizer
+////////////////////////////////////
+openChannelOrganizer(integer channel) {
+    debug ("Opening channel " + (string) channel + " for FM Organizer.");
+    llListen(channel, "", NULL_KEY, "");
+    channelOrganizer = channel;
+    integer i = 0;
+    string description = "";
+
+    // send a request to reposition the prim
+    // only if the prim has been rezzer by an organizer;
+    list desc = llParseString2List(llGetObjectDesc(), ["#"],[]);
+    integer sizeList = llGetListLength(desc);
+    if (sizeList>1) {
+
+        for (i = 0; i < (sizeList-1); i++) {
+            description += llList2String(desc, i);
+        }
+        llSetObjectDesc (description);
+        llRegionSay(channelOrganizer, K_HEADER_MSG_REZZAT_POS_REQUEST + "|" + llGetObjectDesc() + "|" + llList2String(desc, sizeList-1));
+
+    }
+    //llOwnerSay ("send " + K_HEADER_MSG_REZZAT_POS_REQUEST + "|" + llGetObjectDesc() + " on channel " + (string)channelOrganizer);
 }
 
 ///////////////////////////////////////////
@@ -80,7 +114,7 @@ string getConfigParameter (string name, list parameters) {
     debug ("Index getParameter pour " + name + " = " + (string) index);
     string returnValue = "";
     if ((index >= 0) && index < (llGetListLength(parameters)-1)) {
-        returnValue = llList2String(parameters, index+1); 
+        returnValue = llList2String(parameters, index+1);
     }
     debug ("valeur paramètre pour " + name + " = " + (string) returnValue);
     return returnValue;
@@ -101,18 +135,16 @@ processHandshake (string componentName, key sender) {
         uuidOrchestrator = sender;
         llRegionSayTo(sender, HANDSHAKE_CHANNEL, K_HEADER_MSG_HANDSHAKE+ "," + name);
         debug ("Sending handshake to channel " + (string)HANDSHAKE_CHANNEL + " to " + (string)sender + " : " + K_HEADER_MSG_HANDSHAKE+ "," + name );
-        // sending callback message to all scripts 
-        llMessageLinked (LINK_SET, 0, K_CALLBACK_HANDSHAKE, (key) K_ID_MESSAGELINK_FMPROTOCOL);
     }
 }
 
 ////////////////////////////////////////////////////////////
-// Process a one cmd 
+// Process a one cmd
 ///////////////////////////////////////////////////////////
 processOneCmd (string cmdLine, key sender) {
     list tokens = llParseString2List(cmdLine, [","], []);
     string cmd = llToUpper(llList2String(tokens, 0));
-    
+
     if (cmd == K_HEADER_MSG_HANDSHAKE) {
         processHandshake (llList2String(tokens, 1), sender);
     } else {
@@ -123,56 +155,106 @@ processOneCmd (string cmdLine, key sender) {
     }
 }
 
+////////////////////////////////////////////////////////////
+// Process a one cmd
+///////////////////////////////////////////////////////////
+sendPosAndRot(key sender) {
+
+    if (llGetOwnerKey(sender) == llGetOwner()) {
+        //do not answer to a sender that is not the owner of the prims
+        string componentType = llGetObjectName();
+        string componentName = llGetObjectDesc();
+        string pos = (string)llGetPos();
+        string rot = (string) (llRot2Euler(llGetRot()) * RAD_TO_DEG);
+        llRegionSayTo(sender, channelOrganizer, K_HEADER_MSG_REGISTER_POS_RESPONSE
+        + "|" + componentName
+        + "|" + componentType
+        + "|" + pos
+        + "|" + rot);
+    }
+}
 
 ////////////////////////////////////////////////////////////
 // Process a cmd line that can contains more than one cmd
 ///////////////////////////////////////////////////////////
 processCmdLine (list cmdLine, key sender) {
-    
+
     integer nbCmd = llGetListLength(cmdLine);
     integer i = 0;
-    
+
     for (;i<nbCmd; i++) {
         processOneCmd(llList2String(cmdLine, i), sender);
-    }    
+    }
 }
 
 getConfig(){
     llMessageLinked(LINK_SET, 0, K_MSG_SEND_CONFIG, (key)K_ID_MESSAGELINK_CONFIG_TO);
 }
 
+repositionPrim(vector pos, vector rot) {
+    llSetLinkPrimitiveParamsFast(0, [PRIM_POSITION, pos, PRIM_ROTATION, llGetRot()*(llEuler2Rot(rot*DEG_TO_RAD))]);
+}
+
+unrezz (string showToUnrezz) {
+    if (showName == showToUnrezz) {
+        llDie();
+    }
+}
 
 default
 {
     state_entry() {
         getConfig();
     }
-    
+
     // configuration management
     link_message(integer sender_num, integer num, string msg, key id) {
         if ((num == K_CHANNEL_CONFIG) && ((string)id == K_ID_MESSAGELINK_CONFIG_FROM)) {
             //this is the config sent by the configSrv
             list parameters = llParseString2List(msg, ["|"], []);
             string value = getConfigParameter("channelCmd", parameters);
-            
+
             if ((integer)value != 0) {
                 openChannelCmd((integer)value);
             }
-            
+
+            value = getConfigParameter("channelOrganizer", parameters);
+            if ((integer)value != 0) {
+                openChannelOrganizer((integer)value);
+            }
         }
     }
-    
+
     // listen commands sent via chat of FM integration
     listen( integer canal, string name, key id, string message) {
         if (canal == channelIntegration) {
             debug ("received msg in listen = " + message + " by " + (string)id);
-            list parameters = llParseString2List(message, ["|"], []);   
-            processCmdLine(parameters, id); 
-        } 
+            list parameters = llParseString2List(message, ["|"], []);
+            processCmdLine(parameters, id);
+        }  else if ((canal == channelOrganizer) && (llGetOwnerKey(id)==llGetOwner())) {
+            if (message == K_HEADER_MSG_REGISTER_POS_REQUEST) {
+                sendPosAndRot(id);
+            } else {
+                list response = llParseString2List(message, ["|"],[]);
+                string cmd = llList2String(response,0);
+                if (cmd == K_HEADER_MSG_REZZAT_POS_RESPONSE) {
+                    vector pos = (vector)llList2String(response,1);
+                    vector rot = (vector)llList2String(response,2);
+                    showName = llList2String(response,3);
+                    repositionPrim(pos, rot);
+                } else if (cmd == K_HEADER_MSG_UNREZZ) {
+                    string showToUnrezz = llList2String(response,1);
+                    unrezz (showToUnrezz);
+                }
+            }
+        }
     }
-    
-    on_rez(integer start_param) {
+
+    on_rez(integer startParam) {
+        if (startParam != 0) {
+            llSetObjectDesc(llGetObjectDesc()+ "#" + (string) startParam);
+        }
         // Redémarre le script à chaque fois que l’objet est rez
-        llResetScript(); 
-    }   
+        llResetScript();
+    }
 }
