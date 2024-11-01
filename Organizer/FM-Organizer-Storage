@@ -1,0 +1,104 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//  Lady Green Forensic Component     : FULLMONTY - ORGANIZER
+//
+//  Signature                         : LGF/APPS/FULLMONTY/ORGANIZER_STORAGE
+//  Component version                 : 1.0.0
+//  release date                      : September 2024
+//
+//  Description : This component store definition of shows and rezz positions.
+//
+//
+//  copyright © Lady Green Forensic 2024
+//
+//  This script is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License, version 3
+//  (https://www.gnu.org/licenses/gpl-3.0.html)lcode)
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////
+// constants
+////////////////////////////////////
+string K_Version = "1.0.0"; // version of the component
+
+// MessageLinked integer message codes;
+
+string K_ID_MESSAGELINK_RESTORE = "RESTORE_ORGANIZER";
+string K_ID_MESSAGELINK_SAVE = "SAVE_ORGANIZER";
+
+integer K_START_SAVE = 0;
+integer K_SHOW_ITEM_STRING_SAVE = 1;
+integer K_SHOW_ITEM_VECTOR_SAVE = 2;
+integer K_POS_REZZER_STRING_SAVE = 5;
+integer K_POS_REZZER_VECTOR_SAVE = 6;
+integer K_END_SAVE = 10;
+
+integer K_START_RESTORE = 100;
+integer K_SHOW_ITEM_STRING_RESTORE = 101;
+integer K_SHOW_ITEM_VECTOR_RESTORE = 102;
+integer K_POS_REZZER_STRING_RESTORE = 105;
+integer K_POS_REZZER_VECTOR_RESTORE = 106;
+integer K_END_RESTORE = 110;
+
+////////////////////////////////////
+// variables
+////////////////////////////////////
+list showItems = [];
+list posRezzer = [];
+
+//////////////////////////////////////////////////
+// restore the organizer
+//////////////////////////////////////////////////
+restore() {
+    integer i = 0;
+    integer size = llGetListLength(showItems);
+
+    for (i =0; i<size; i= i+4) {
+        llMessageLinked(LINK_THIS, K_SHOW_ITEM_STRING_RESTORE, llList2String(showItems, i), K_ID_MESSAGELINK_RESTORE);
+        llMessageLinked(LINK_THIS, K_SHOW_ITEM_STRING_RESTORE, llList2String(showItems, i+1), K_ID_MESSAGELINK_RESTORE);
+        llMessageLinked(LINK_THIS, K_SHOW_ITEM_VECTOR_RESTORE, (string)llList2Vector(showItems, i+2), K_ID_MESSAGELINK_RESTORE);
+        llMessageLinked(LINK_THIS, K_SHOW_ITEM_VECTOR_RESTORE, (string)llList2Vector(showItems, i+3), K_ID_MESSAGELINK_RESTORE);
+    }
+
+    size = llGetListLength(posRezzer);
+    for (i =0; i<size; i= i+3) {
+        llMessageLinked(LINK_THIS, K_POS_REZZER_STRING_RESTORE, llList2String(posRezzer, i), K_ID_MESSAGELINK_RESTORE);
+        llMessageLinked(LINK_THIS, K_POS_REZZER_VECTOR_RESTORE, (string)llList2Vector(posRezzer, i+1), K_ID_MESSAGELINK_RESTORE);
+        llMessageLinked(LINK_THIS, K_POS_REZZER_VECTOR_RESTORE, (string)llList2Vector(posRezzer, i+2), K_ID_MESSAGELINK_RESTORE);
+    }
+
+    llMessageLinked(LINK_THIS, K_END_RESTORE, "", K_ID_MESSAGELINK_RESTORE);
+}
+
+default
+{
+    state_entry() {
+    }
+
+    link_message(integer sender_num, integer idMessage, string msg, key idTarget) {
+        if ((string)idTarget == K_ID_MESSAGELINK_RESTORE)  {
+            if (idMessage == K_START_RESTORE){
+                restore();
+            }
+        } else if ((string)idTarget == K_ID_MESSAGELINK_SAVE)  {
+            if (idMessage == K_START_SAVE){
+                llOwnerSay ("***** FM Organizer saving shows.");
+                showItems = [];
+                posRezzer = [];
+            } else if (idMessage == K_SHOW_ITEM_STRING_SAVE){
+                showItems += msg;
+            } else if (idMessage == K_SHOW_ITEM_VECTOR_SAVE){
+                showItems += (vector)msg;
+            } else if (idMessage == K_POS_REZZER_STRING_SAVE){
+                posRezzer += msg;
+            }  else if (idMessage == K_POS_REZZER_VECTOR_SAVE){
+                posRezzer += (vector)msg;
+            } else if (idMessage == K_END_SAVE) {
+                llOwnerSay ("***** FM Organizer successfully saved.");
+            }
+        }
+    }
+}
