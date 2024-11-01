@@ -24,7 +24,7 @@
 ////////////////////////////////////
 // constants
 ////////////////////////////////////
-string K_Version = "0.1.0"; // version of the component
+string K_Version = "1.1.0"; // version of the component
 
 // Configuration
 integer K_CHANNEL_CONFIG = 9;
