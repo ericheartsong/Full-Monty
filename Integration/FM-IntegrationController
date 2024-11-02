@@ -187,14 +187,24 @@ processCmdLine (list cmdLine, key sender) {
     }
 }
 
+////////////////////////////////////////////////////////////
+// Load the config file
+///////////////////////////////////////////////////////////
 getConfig(){
     llMessageLinked(LINK_SET, 0, K_MSG_SEND_CONFIG, (key)K_ID_MESSAGELINK_CONFIG_TO);
 }
 
+////////////////////////////////////////////////////////////
+// Reposition the prim according to the registered pos and
+// rot in the organizer
+///////////////////////////////////////////////////////////
 repositionPrim(vector pos, vector rot) {
     llSetLinkPrimitiveParamsFast(0, [PRIM_POSITION, pos, PRIM_ROTATION, llGetRot()*(llEuler2Rot(rot*DEG_TO_RAD))]);
 }
 
+////////////////////////////////////////////////////////////
+// unrezz the prim when requested by the organizer
+///////////////////////////////////////////////////////////
 unrezz (string showToUnrezz) {
     if (showName == showToUnrezz) {
         llDie();
